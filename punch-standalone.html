@@ -4372,36 +4372,58 @@
     <!-- Last Punch / Today Total removed (read-only tracker shows session breakdown below) -->
 
     <div class="stats">
-      <div class="stat">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Started At</div>
         <div id="startedAt">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Worked So Far</div>
         <div id="workedSoFar">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Remaining</div>
         <div id="remaining">—</div>
       </div>
-      <div class="stat">
+      <div class="stat" style="flex:2 1 auto;min-width:300px">
         <div class="label">Expected Leave</div>
-        <div id="expectedLeave">—</div>
+        <div id="expectedLeave" style="line-height:1.2;min-height:50px">—</div>
       </div>
     </div>
 
     <div class="stats">
-      <div class="stat" style="flex:0 0 130px">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Breaks Today</div>
-        <div id="breaksTotal">—</div>
+        <div id="breaksTotal" style="line-height:1.2;min-height:40px">—</div>
       </div>
-      <div class="stat" style="flex:0 0 170px">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Breaks allowed (remaining)</div>
-        <div id="breaksRemaining">—</div>
+        <div id="breaksRemaining" style="line-height:1.2;min-height:40px">—</div>
       </div>
-      <div class="stat" style="flex:1 1 auto;min-width:220px">
+    </div>
+
+    <div class="log">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h3>Recent punches</h3>
+        <button id="expandPunchesBtn" class="btn outline" style="font-size:0.7em;padding:1px 4px;height:20px;line-height:1;min-width:50px;max-width:60px;">View All</button>
+      </div>
+      <ul id="punchList"></ul>
+    </div>
+
+    <!-- Overlay for full punch details -->
+    <div id="punchOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.3);backdrop-filter:blur(5px);z-index:1000;justify-content:center;align-items:center;">
+      <div style="background:rgba(255,255,255,0.95);border-radius:8px;padding:20px;max-width:800px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.1);border:1px solid rgba(255,255,255,0.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h3 style="margin:0;">All Punch Records</h3>
+          <button id="closeOverlayBtn" class="btn outline" style="font-size:0.8em;padding:2px 6px;height:24px;line-height:1;min-width:40px;max-width:50px;">Close</button>
+        </div>
+        <ul id="fullPunchList" style="list-style:none;padding:0;margin:0;"></ul>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat" style="flex:1 1 auto">
         <div class="label">Controls</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
           <button id="refreshBtn" class="btn outline">Refresh</button>
           <button id="setHoursBtn" class="btn outline">Set target hours</button>
           <button id="setBreakBtn" class="btn outline">Set allowed break</button>
@@ -4411,21 +4433,17 @@
       </div>
     </div>
 
-
-      <div class="log">
-      <h3>Recent punches</h3>
-      <ul id="punchList"></ul>
+    <div class="footer" style="position: sticky; bottom: 0; background: white; padding: 10px 15px; border-top: 1px solid #dee2e6; margin-top: 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.8em;color:#666;width:100%;">
+        <div style="text-align:left;flex:0 0 auto;">Date: <span id="modeLabel">—</span></div>
+        <div style="text-align:center;flex:1 1 auto;min-width:0;">Last sync: <span id="lastSync">—</span></div>
+        <div style="text-align:right;flex:0 0 auto;">Target: <span id="targetLabel">—</span></div>
+      </div>
     </div>
 
       <!-- Nearby breaks removed per user request -->
 
     </div>
-
-  <div class="footer">
-    <div class="small">Date: <span id="modeLabel">—</span></div>
-    <div class="small">Last sync: <span id="lastSync">—</span></div>
-    <div class="small">Target: <span id="targetLabel">—</span></div>
-  </div>
 
   <script>
     (function(){
@@ -4445,6 +4463,10 @@
       const setKeyBtn = document.getElementById('setKeyBtn');
       const targetLabel = $('targetLabel');
       const breaksRemainingEl = $('breaksRemaining');
+      const expandPunchesBtn = $('expandPunchesBtn');
+      const closeOverlayBtn = $('closeOverlayBtn');
+      const punchOverlay = $('punchOverlay');
+      const fullPunchList = $('fullPunchList');
       
       // initialize custom allowed break (null means auto-compute based on first IN time)
       let allowedBreakMinutesCustom = null;
@@ -4602,7 +4624,11 @@
         const parsedAll = items.map(it=>({ item: it, date: parseDateFromItem(it) })).filter(x=>x.date instanceof Date && !isNaN(x.date));
         parsedAll.sort((a,b)=>a.date - b.date);
 
-          // Calculate worked and breaks
+        // Store all sessions for overlay view
+        window.__allSessions = sessions;
+        window.__allParsedAll = parsedAll;
+
+          // Calculate worked and breaks (for all sessions)
           let totalWorked = 0;
           let totalBreak = 0;
           for(let i=0;i<sessions.length;i++){
@@ -4618,6 +4644,18 @@
               const gap = Math.max(0, sessions[i+1].inDate.getTime() - outTs);
               totalBreak += gap;
             }
+          }
+
+          // Show only last 3 sessions
+          const recentSessions = sessions.slice(-3);
+          for(let i=0;i<recentSessions.length;i++){
+            const s = recentSessions[i];
+            const sessionIndex = sessions.indexOf(s); // Get original index
+            const inTs = s.inDate ? s.inDate.getTime() : null;
+            const outTs = s.outDate ? s.outDate.getTime() : null;
+            let dur = 0;
+            if (inTs && outTs) dur = Math.max(0, outTs - inTs);
+            else if (inTs && !outTs) dur = Math.max(0, Date.now() - inTs);
 
             // collect all raw timestamps that fall within this session (inclusive)
             let logsEntries = [];
@@ -4643,7 +4681,7 @@
 
             const indexLabel = document.createElement('div');
             indexLabel.className = 'session-index';
-            indexLabel.textContent = String(i+1).padStart(2,'0');
+            indexLabel.textContent = String(sessionIndex+1).padStart(2,'0');
 
             header.appendChild(toggle);
             header.appendChild(indexLabel);
@@ -4656,7 +4694,9 @@
             const durStr = msToHms(durMs);
             // compute break after this session
             let breakAfterMs = null;
-            if (outTs && sessions[i+1] && sessions[i+1].inDate){ breakAfterMs = Math.max(0, sessions[i+1].inDate.getTime() - outTs); }
+            if (outTs && window.__allSessions[sessionIndex+1] && window.__allSessions[sessionIndex+1].inDate){ 
+              breakAfterMs = Math.max(0, window.__allSessions[sessionIndex+1].inDate.getTime() - outTs); 
+            }
             const breakStr = breakAfterMs ? msToHms(breakAfterMs) : null;
             meta.innerHTML = `Dur: ${durStr}${breakStr? '<br>Break: '+breakStr : ''}`;
             header.appendChild(meta);
@@ -4845,37 +4885,106 @@
                 }
               }
 
-              const allowedBreakMs = (base.allowedBreakMinutes || 0) * 60 * 1000;
-              const officeTargetMs = base.targetMs + allowedBreakMs;
-              const timeInOfficeSoFarMs = liveWorkedMs + base.breaksMs;
-              const remainingMs = Math.max(0, officeTargetMs - timeInOfficeSoFarMs);
+              const allowedBreakMs = (base.allowedBreakMinutes !== null ? base.allowedBreakMinutes : 75) * 60 * 1000;
+              const excessBreakMs = Math.max(0, base.breaksMs - allowedBreakMs);
+              // Remaining work time = target work hours - worked so far
+              const remainingMs = Math.max(0, base.targetMs - liveWorkedMs);
+
+              // Calculate break variables once for reuse
+              const remainingBreakMs = Math.max(0, allowedBreakMs - base.breaksMs);
+              const isExceeded = base.breaksMs > allowedBreakMs;
 
               // Update Worked So Far & Remaining
               $('workedSoFar').textContent = msToHms(liveWorkedMs);
               $('remaining').textContent = msToHms(remainingMs);
-              $('breaksTotal').textContent = `${Math.round(base.breaksMs/60000)} min`;
+              
+              // Update breaks today with clean, simple display (side-by-side)
+              const formatBreakTime = (minutes) => {
+                const h = Math.floor(minutes / 60);
+                const m = Math.round(minutes % 60);
+                return h + 'h ' + m + 'm';
+              };
+              
+              if (isExceeded) {
+                $('breaksTotal').innerHTML = 
+                  '<div style="display: flex; gap: 12px; font-size: 0.9em;">' +
+                  '<div style="color: #666;">' + formatBreakTime(Math.round(base.breaksMs/60000)) + ' taken</div>' +
+                  '<div style="color: #ff4444; font-weight: bold;">+' + formatBreakTime(Math.round(excessBreakMs/60000)) + ' excess</div>' +
+                  '</div>';
+              } else {
+                $('breaksTotal').innerHTML = 
+                  '<div style="display: flex; gap: 12px; font-size: 0.9em;">' +
+                  '<div style="color: #666;">' + formatBreakTime(Math.round(base.breaksMs/60000)) + ' taken</div>' +
+                  '<div style="color: #38a169;">' + formatBreakTime(Math.round(remainingBreakMs/60000)) + ' remaining</div>' +
+                  '</div>';
+              }
 
-              // Expected Leave: current time + remaining when session is open; otherwise compute normally
-              const lastSession = result.sessions[result.sessions.length - 1];
-              const lastSessionHasOut = lastSession && lastSession.outDate;
+              // Update breaks remaining with clean, simple display (side-by-side)
+              if (breaksRemainingEl) {
+                const allowedBreakMinutes = base.allowedBreakMinutes !== null ? base.allowedBreakMinutes : 75;
+                
+                if (isExceeded) {
+                  breaksRemainingEl.innerHTML = 
+                    '<div style="display: flex; gap: 12px; font-size: 0.9em;">' +
+                    '<div style="color: #ff4444; font-weight: bold;">0h 0m remaining</div>' +
+                    '<div style="color: #666;">(' + formatBreakTime(allowedBreakMinutes) + ' allowed)</div>' +
+                    '</div>';
+                } else {
+                  breaksRemainingEl.innerHTML = 
+                    '<div style="display: flex; gap: 12px; font-size: 0.9em;">' +
+                    '<div style="color: #38a169;">' + formatBreakTime(Math.round(remainingBreakMs/60000)) + ' remaining</div>' +
+                    '<div style="color: #666;">(' + formatBreakTime(allowedBreakMinutes) + ' allowed)</div>' +
+                    '</div>';
+                }
+              }
+
+              // Expected Leave = first IN + work target + breaks taken + remaining breaks
               let leaveAt;
-
-              if (base.firstIn && !lastSessionHasOut) {
-                // Open session: Expected Leave = now + remaining (live)
-                leaveAt = new Date(nowTs + remainingMs);
-              } else if (base.firstIn) {
-                // Closed session: Expected Leave = first IN + total office time
-                const totalOfficeTimeMs = liveWorkedMs + base.breaksMs + remainingMs;
-                leaveAt = new Date(base.firstIn + totalOfficeTimeMs);
-              } else if (result.sessions && result.sessions.length > 0) {
-                // No IN but has sessions (e.g., only OUTs): fallback to now + remaining
-                leaveAt = new Date(nowTs + remainingMs);
+              
+              // Expected Leave calculation
+              let normalLeaveAt, extendedLeaveAt;
+              if (base.firstIn || (result.sessions && result.sessions.length > 0)) {
+                // Expected Leave = first IN time + target work hours + allowed breaks
+                let firstInTime;
+                if (base.firstIn) {
+                  // Parse base.firstIn (might be string or Date)
+                  firstInTime = base.firstIn.getTime ? base.firstIn.getTime() : new Date(base.firstIn).getTime();
+                } else if (result.sessions && result.sessions.length > 0 && result.sessions[0].inDate) {
+                  firstInTime = result.sessions[0].inDate.getTime ? result.sessions[0].inDate.getTime() : new Date(result.sessions[0].inDate).getTime();
+                } else {
+                  $('expectedLeave').textContent = '—';
+                  return;
+                }
+                
+                const targetWorkMs = base.targetMs || (CONFIG.WORK_HOURS * 60 * 60 * 1000);
+                const allowedBreakMs = (base.allowedBreakMinutes !== null ? base.allowedBreakMinutes : 75) * 60 * 1000;
+                
+                // Normal leave time (without excess breaks)
+                normalLeaveAt = new Date(firstInTime + targetWorkMs + allowedBreakMs);
+                
+                // Extended leave time (with excess breaks)
+                extendedLeaveAt = new Date(firstInTime + targetWorkMs + allowedBreakMs + excessBreakMs);
+                leaveAt = extendedLeaveAt;
               } else {
                 // No punches: hide Expected Leave
                 $('expectedLeave').textContent = '—';
                 return;
               }
-              $('expectedLeave').textContent = formatDateTime(leaveAt.toISOString());
+              // Show expected leave with clean, simple display
+              if (isExceeded) {
+                // Show both times side-by-side with excess break below Extended
+                $('expectedLeave').innerHTML = 
+                  '<div style="display: flex; gap: 12px; font-size: 0.9em;">' +
+                  '<div style="color: #666;">Normal: ' + formatDateTime(normalLeaveAt.toISOString()) + '</div>' +
+                  '<div>' +
+                    '<div style="color: #ff4444; font-weight: bold;">Extended: ' + formatDateTime(extendedLeaveAt.toISOString()) + '</div>' +
+                    '<div style="font-size: 0.8em; color: #ed8936; margin-top: 2px;">+' + formatBreakTime(Math.round(excessBreakMs/60000)) + ' excess breaks</div>' +
+                  '</div>' +
+                  '</div>';
+              } else {
+                $('expectedLeave').innerHTML = 
+                  '<div style="font-size: 0.9em; color: #38a169; font-weight: 500;">' + formatDateTime(normalLeaveAt.toISOString()) + '</div>';
+              }
             }
 
             // Run once immediately for this refresh
@@ -4956,6 +5065,116 @@
         const takenBreakMs = totalBreakMs || 0;
         const remainingBreakMs = Math.max(0, allowedBreakMs - takenBreakMs);
         breaksRemainingEl.textContent = `${Math.round(remainingBreakMs/60000)} min`;
+      }
+
+      // Overlay functionality for full punch list
+      function showFullPunchOverlay() {
+        if (!window.__allSessions || !window.__allParsedAll) return;
+        
+        const fullPunchList = $('fullPunchList');
+        fullPunchList.innerHTML = '';
+        
+        // Render all sessions in overlay
+        for(let i=0;i<window.__allSessions.length;i++){
+          const s = window.__allSessions[i];
+          const inTs = s.inDate ? s.inDate.getTime() : null;
+          const outTs = s.outDate ? s.outDate.getTime() : null;
+          let dur = 0;
+          if (inTs && outTs) dur = Math.max(0, outTs - inTs);
+          else if (inTs && !outTs) dur = Math.max(0, Date.now() - inTs);
+
+          // collect all raw timestamps that fall within this session (inclusive)
+          let logsEntries = [];
+          if (inTs && outTs){
+            logsEntries = window.__allParsedAll.filter(p=>{ const t = p.date.getTime(); return t>=inTs && t<=outTs; });
+          } else if (inTs && !outTs){
+            logsEntries = window.__allParsedAll.filter(p=>{ const t = p.date.getTime(); return t>=inTs; });
+          } else if (!inTs && outTs){
+            logsEntries = window.__allParsedAll.filter(p=>{ const t = p.date.getTime(); return t<=outTs; });
+          }
+
+          const li = document.createElement('li');
+          li.className = 'session-group';
+          li.style.marginBottom = '15px';
+
+          const header = document.createElement('div');
+          header.className = 'session-header';
+          header.style.display = 'flex';
+          header.style.alignItems = 'center';
+          header.style.gap = '8px';
+
+          const indexLabel = document.createElement('div');
+          indexLabel.className = 'session-index';
+          indexLabel.textContent = String(i+1).padStart(2,'0');
+          indexLabel.style.background = '#007bff';
+          indexLabel.style.color = 'white';
+          indexLabel.style.padding = '4px 8px';
+          indexLabel.style.borderRadius = '4px';
+          indexLabel.style.fontSize = '0.9em';
+
+          header.appendChild(indexLabel);
+          const summary = document.createElement('div'); 
+          summary.style.flex = '1';
+          summary.textContent = logsEntries.map(p=>formatTime(p.date.toISOString())).join(' → ');
+          header.appendChild(summary);
+          
+          // session meta: duration and break
+          const meta = document.createElement('div'); 
+          meta.className = 'session-meta';
+          const durMs = dur || 0;
+          const durStr = msToHms(durMs);
+          // compute break after this session
+          let breakAfterMs = null;
+          if (outTs && window.__allSessions[i+1] && window.__allSessions[i+1].inDate){ 
+            breakAfterMs = Math.max(0, window.__allSessions[i+1].inDate.getTime() - outTs); 
+          }
+          const breakStr = breakAfterMs ? msToHms(breakAfterMs) : null;
+          meta.innerHTML = `Dur: ${durStr}${breakStr? '<br>Break: '+breakStr : ''}`;
+          meta.style.color = '#666';
+          meta.style.fontSize = '0.9em';
+          header.appendChild(meta);
+
+          const logsDiv = document.createElement('div');
+          logsDiv.className = 'session-logs';
+          logsDiv.style.marginTop = '8px';
+          logsDiv.style.padding = '8px';
+          logsDiv.style.background = '#f8f9fa';
+          logsDiv.style.borderRadius = '4px';
+          if (logsEntries.length===0) logsDiv.innerHTML = '<div style="color: #666;">(no raw timestamps)</div>';
+          else logsEntries.forEach(p=>{ 
+            const e = document.createElement('div'); 
+            e.style.color = '#666';
+            e.style.fontSize = '0.85em';
+            e.textContent = formatTime(p.date.toISOString()); 
+            logsDiv.appendChild(e); 
+          });
+
+          li.appendChild(header);
+          li.appendChild(logsDiv);
+          fullPunchList.appendChild(li);
+        }
+        
+        // Show overlay
+        punchOverlay.style.display = 'flex';
+      }
+
+      function hideFullPunchOverlay() {
+        punchOverlay.style.display = 'none';
+      }
+
+      // Event listeners for overlay
+      if (expandPunchesBtn) {
+        expandPunchesBtn.addEventListener('click', showFullPunchOverlay);
+      }
+      if (closeOverlayBtn) {
+        closeOverlayBtn.addEventListener('click', hideFullPunchOverlay);
+      }
+      if (punchOverlay) {
+        punchOverlay.addEventListener('click', function(e) {
+          if (e.target === punchOverlay) {
+            hideFullPunchOverlay();
+          }
+        });
       }
 
       // init

@@ -1,0 +1,4969 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Punch In / Out — Single File</title>
+  <style>
+    :root{--bg-start:#fff5f8;--bg-end:#ffe0ec;--card:rgba(255,255,255,0.8);--muted:#d81b60;--accent:#e91e63;--accent-2:#fbcfde;--cream:#fff9c4;--glass:rgba(255,255,255,0.5);--crystal:rgba(255,255,255,0.7);--shadow-light:rgba(233,30,99,0.1);--shadow-glass:rgba(255,255,255,0.6)}
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;padding:20px;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#000;background:linear-gradient(135deg,var(--bg-start),var(--bg-end)),radial-gradient(circle at 20% 80%, rgba(233,30,99,0.05) 0%, transparent 50%),radial-gradient(circle at 80% 20%, rgba(240,98,146,0.05) 0%, transparent 50%),radial-gradient(circle at 50% 50%, rgba(255,255,255,0.3) 0%, transparent 70%);backdrop-filter:blur(10px);min-height:100vh}
+    .card{width:calc(100% - 40px);max-width:none;border-radius:20px;padding:32px;background:linear-gradient(135deg,var(--crystal),var(--glass)),linear-gradient(180deg,var(--card),rgba(255,255,255,0.1));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--shadow-glass);box-shadow:0 8px 32px var(--shadow-light),0 2px 8px rgba(0,0,0,0.1),inset 0 1px 0 rgba(255,255,255,0.4);position:relative;overflow:hidden}
+    .user-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    h1{font-size:22px;margin:0;letter-spacing:0.4px} .muted{color:var(--muted);margin:0}
+    .status-pill{padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;box-shadow:0 4px 12px rgba(236,72,153,0.3)}
+    .stats{display:flex;gap:12px;margin-bottom:14px}
+    .stat{flex:1;padding:16px;border-radius:16px;background:linear-gradient(135deg,var(--crystal),var(--glass)),linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.05));backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px);border:1px solid var(--shadow-glass);box-shadow:0 4px 16px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.3);position:relative;overflow:hidden}
+    .label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .actions{display:flex;gap:12px;margin-bottom:14px}
+    .btn{flex:1;padding:12px 16px;border-radius:12px;border:2px solid var(--accent);cursor:pointer;font-weight:600;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;box-shadow:0 4px 16px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.3)}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.4);background:linear-gradient(135deg,var(--accent-2),var(--accent))}
+    .btn.outline{background:linear-gradient(135deg,var(--crystal),var(--glass));border:2px solid var(--muted);color:var(--muted);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 16px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.3)}.btn.outline:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.4);background:linear-gradient(135deg,var(--muted),var(--accent));color:#fff}
+    .log h3{margin:0 0 8px 0;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+    .log-controls{display:none}
+    #punchList{list-style:none;padding:0;margin:0;max-height:260px;overflow:auto}
+    #punchList li{padding:8px;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,var(--crystal),var(--glass));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--shadow-glass)}
+    .session-group{display:block}
+    .session-header{display:flex;align-items:center;gap:12px;padding:8px;cursor:pointer}
+    .session-index{width:48px;font-weight:700}
+    .session-inout{flex:1;text-align:right;font-size:13px}
+    .session-logs{padding:8px 12px 12px 60px;border-top:1px dashed rgba(180,120,120,0.08);font-size:13px;color:var(--muted);max-height:0;overflow:hidden;opacity:0;transition:max-height 260ms ease, opacity 220ms ease}
+    .session-logs.open{opacity:1}
+    .session-logs .log-entry{padding:4px 0}
+    .session-meta{width:180px;text-align:right;font-size:13px;color:var(--muted)}
+    /* Realistic Sitting Animation for Started At */
+    .office-sit-container {
+      position: relative;
+      width: 100%;
+      height: 120px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(0,150,0,0.1) 0%, rgba(0,100,0,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .sit-scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .office-desk-main {
+      position: absolute;
+      bottom: 15px;
+      right: 20px;
+      width: 80px;
+      height: 50px;
+    }
+
+    .desk-surface-main {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .office-laptop {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      width: 35px;
+      height: 20px;
+    }
+
+    .laptop-base-main {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 35px;
+      height: 3px;
+      background: linear-gradient(180deg, #c0c0c0, #808080);
+      border-radius: 1px;
+    }
+
+    .laptop-screen-main {
+      position: absolute;
+      bottom: 3px;
+      left: 2px;
+      width: 31px;
+      height: 17px;
+      background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+      border-radius: 2px;
+      border: 1px solid #c0c0c0;
+      overflow: hidden;
+    }
+
+    .screen-off-main {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a1a1a;
+      animation: screenWakeUp 4s ease-in-out infinite;
+    }
+
+    .screen-content-working {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #00ff00, #00aa00);
+      opacity: 0;
+      animation: screenWork 4s ease-in-out infinite;
+    }
+
+    .typing-dots {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 4px;
+      display: flex;
+      gap: 2px;
+      opacity: 0;
+      animation: typingShow 4s ease-in-out infinite;
+    }
+
+    .dot {
+      width: 2px;
+      height: 2px;
+      background: white;
+      border-radius: 50%;
+      animation: dotBlink 1s ease-in-out infinite;
+    }
+
+    .dot2 { animation-delay: 0.3s; }
+    .dot3 { animation-delay: 0.6s; }
+
+    .desk-accessories {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 30px;
+      height: 15px;
+    }
+
+    .coffee-cup-main {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 10px;
+      height: 12px;
+    }
+
+    .coffee-cup-main::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 8px;
+      height: 10px;
+      background: linear-gradient(135deg, #8b4513, #654321);
+      border-radius: 0 0 4px 4px;
+    }
+
+    .coffee-cup-main::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      right: -2px;
+      width: 3px;
+      height: 6px;
+      border: 1px solid #654321;
+      border-left: none;
+      border-radius: 0 2px 2px 0;
+    }
+
+    .steam-main {
+      position: absolute;
+      top: -5px;
+      left: 2px;
+      width: 6px;
+      height: 5px;
+    }
+
+    .steam-main::before,
+    .steam-main::after {
+      content: '';
+      position: absolute;
+      width: 1px;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: steamRiseMain 2s ease-in-out infinite;
+    }
+
+    .steam-main::before { left: 1px; animation-delay: 0s; }
+    .steam-main::after { left: 3px; animation-delay: 0.7s; }
+
+    .mouse-pad {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 15px;
+      height: 10px;
+      background: linear-gradient(135deg, #333333, #1a1a1a);
+      border-radius: 2px;
+    }
+
+    .office-chair-main {
+      position: absolute;
+      bottom: 10px;
+      left: 20px;
+      width: 40px;
+      height: 60px;
+    }
+
+    .chair-back-main {
+      position: absolute;
+      bottom: 25px;
+      left: 5px;
+      width: 30px;
+      height: 25px;
+      background: linear-gradient(180deg, #2c3e50, #34495e);
+      border-radius: 6px 6px 0 0;
+    }
+
+    .chair-seat-main {
+      position: absolute;
+      bottom: 20px;
+      left: 5px;
+      width: 30px;
+      height: 8px;
+      background: linear-gradient(180deg, #34495e, #2c3e50);
+      border-radius: 3px;
+    }
+
+    .sitting-human {
+      position: absolute;
+      bottom: 28px;
+      left: 8px;
+      width: 25px;
+      height: 35px;
+    }
+
+    .human-figure-sitting {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .human-head-sitting {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 15px;
+      height: 15px;
+      background: linear-gradient(135deg, #fdbcb4, #ffb6c1);
+      border-radius: 50%;
+      animation: headNodSitting 3s ease-in-out infinite;
+    }
+
+    .human-face-sitting {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 11px;
+    }
+
+    .human-eyes-sitting {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 3px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .human-eye-sitting {
+      position: relative;
+      width: 2px;
+      height: 2px;
+      background: white;
+      border-radius: 50%;
+      border: 1px solid #333;
+    }
+
+    .eye-pupil-sitting {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 1px;
+      background: black;
+      border-radius: 50%;
+      animation: eyeFocusSitting 4s ease-in-out infinite;
+    }
+
+    .human-nose-sitting {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 1px;
+      background: rgba(139,69,19,0.3);
+      border-radius: 50%;
+    }
+
+    .human-mouth-sitting.focused {
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 1px;
+      background: #333;
+      border-radius: 1px;
+    }
+
+    .human-hair-sitting {
+      position: absolute;
+      top: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 13px;
+      height: 5px;
+    }
+
+    .hair-strand-sitting {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #4a4a4a;
+      border-radius: 50%;
+    }
+
+    .strand1 { left: 1px; animation: hairSwaySitting 2s ease-in-out infinite; }
+    .strand2 { left: 5px; animation: hairSwaySitting 2s ease-in-out infinite 0.5s; }
+    .strand3 { left: 9px; animation: hairSwaySitting 2s ease-in-out infinite 1s; }
+
+    .human-torso-sitting {
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 15px;
+      background: linear-gradient(180deg, #4169e1, #1e3a8a);
+      border-radius: 6px 6px 3px 3px;
+      animation: torsoSwaySitting 4s ease-in-out infinite;
+    }
+
+    .human-chest-sitting {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 11px;
+      background: linear-gradient(180deg, #6495ed, #4169e1);
+      border-radius: 3px;
+    }
+
+    .human-arms-sitting {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 8px;
+    }
+
+    .human-arm-sitting {
+      position: absolute;
+      width: 2px;
+      height: 12px;
+      background: linear-gradient(180deg, #fdbcb4, #ffb6c1);
+      border-radius: 1px;
+      transform-origin: top center;
+    }
+
+    .human-arm-sitting.typing {
+      animation: armTyping 0.8s ease-in-out infinite;
+    }
+
+    .human-arm-sitting.left {
+      left: 3px;
+      animation-delay: 0s;
+    }
+
+    .human-arm-sitting.right {
+      right: 3px;
+      animation-delay: 0.4s;
+    }
+
+    .human-legs-sitting {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 10px;
+    }
+
+    .human-leg-sitting {
+      position: absolute;
+      width: 3px;
+      height: 8px;
+      background: linear-gradient(180deg, #2c3e50, #34495e);
+      border-radius: 1px;
+    }
+
+    .human-leg-sitting.bent {
+      transform: rotate(15deg);
+      transform-origin: top center;
+    }
+
+    .human-leg-sitting.left {
+      left: 4px;
+    }
+
+    .human-leg-sitting.right {
+      right: 4px;
+    }
+
+    .chair-wheels-main {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 40px;
+      height: 5px;
+    }
+
+    .wheel-main {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #1a1a1a;
+      border-radius: 50%;
+      animation: wheelSpinMain 2s linear infinite;
+    }
+
+    .wheel1 { left: 5px; }
+    .wheel2 { left: 12px; animation-delay: 0.5s; }
+    .wheel3 { left: 19px; animation-delay: 1s; }
+    .wheel4 { left: 26px; animation-delay: 1.5s; }
+
+    .work-effects {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      width: 80px;
+      height: 30px;
+    }
+
+    .typing-indicators {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 15px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      opacity: 0;
+      animation: typingIndicatorShow 4s ease-in-out infinite;
+    }
+
+    .typing-text {
+      font-size: 10px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .typing-cursor {
+      font-size: 12px;
+      color: #00ff00;
+      animation: cursorBlink 1s ease-in-out infinite;
+    }
+
+    .productivity-sparks {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 15px;
+    }
+
+    .spark {
+      position: absolute;
+      font-size: 10px;
+      opacity: 0;
+      animation: sparkFloat 3s ease-in-out infinite;
+    }
+
+    .spark1 { left: 10px; animation-delay: 0s; }
+    .spark2 { left: 30px; animation-delay: 1s; }
+    .spark3 { left: 50px; animation-delay: 2s; }
+
+    .start-text {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 90px;
+      height: 25px;
+      opacity: 0;
+      animation: startTextShow 4s ease-in-out infinite;
+    }
+
+    .start-bubble {
+      background: linear-gradient(135deg, #fff, #f0f0f0);
+      border-radius: 12px;
+      padding: 4px 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: #333;
+      animation: startBubbleWobble 2s ease-in-out infinite;
+    }
+
+    .start-emoji {
+      font-size: 9px;
+      animation: startEmojiPulse 1.5s ease-in-out infinite;
+    }
+
+    .start-message {
+      font-size: 9px;
+      margin: 0 2px;
+    }
+
+    .screen-off {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      bottom: 2px;
+      background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+      border-radius: 1px;
+      opacity: 1;
+      animation: powerOff 2s ease-in-out infinite;
+    }
+
+    .screen-off::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 50%;
+      opacity: 0;
+      animation: powerButton 2s ease-in-out infinite;
+    }
+
+    .screen-content {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      bottom: 2px;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      border-radius: 1px;
+      opacity: 0;
+      animation: bootUp 4s ease-in-out infinite;
+    }
+
+    .screen-content::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        linear-gradient(0deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%),
+        repeating-linear-gradient(
+          90deg,
+          transparent 0px,
+          transparent 3px,
+          rgba(255,255,255,0.05) 3px,
+          rgba(255,255,255,0.05) 6px
+        );
+      opacity: 0;
+      animation: codeScroll 1s linear infinite 3s;
+    }
+
+    .typing-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 10px;
+      opacity: 0;
+      animation: fadeIn 1s ease-in 3.5s forwards;
+    }
+
+    .typing-indicator::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3px;
+      height: 3px;
+      background: white;
+      border-radius: 50%;
+      animation: blink 1s infinite 3.5s;
+    }
+
+    .typing-indicator::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 3px;
+      height: 3px;
+      background: white;
+      border-radius: 50%;
+      animation: blink 1s infinite 4s;
+    }
+
+    .coffee-cup {
+      position: absolute;
+      bottom: 8px;
+      right: 5px;
+      width: 8px;
+      height: 10px;
+      background: linear-gradient(135deg, #8b4513, #654321);
+      border-radius: 0 0 4px 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      opacity: 0;
+      animation: fadeIn 1s ease-in 4s forwards;
+    }
+
+    .coffee-cup::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 4px;
+      height: 6px;
+      border: 1px solid #654321;
+      border-left: none;
+      border-radius: 0 2px 2px 0;
+    }
+
+    .steam {
+      position: absolute;
+      top: -8px;
+      left: 2px;
+      width: 4px;
+      height: 8px;
+    }
+
+    .steam::before,
+    .steam::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 4px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 1px;
+      animation: steamRise 2s ease-in-out infinite 4s;
+    }
+
+    .steam::before {
+      left: 0;
+      animation-delay: 0s;
+    }
+
+    .steam::after {
+      right: 0;
+      animation-delay: 0.5s;
+    }
+
+    .wifi-signal {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 12px;
+      height: 12px;
+      opacity: 0;
+      animation: fadeIn 1s ease-in 3.5s forwards;
+    }
+
+    .wifi-signal::before,
+    .wifi-signal::after {
+      content: '';
+      position: absolute;
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 50%;
+      animation: wifiPulse 2s ease-in-out infinite 3.5s;
+    }
+
+    .wifi-signal::before {
+      width: 8px;
+      height: 8px;
+      top: 2px;
+      left: 2px;
+      border-style: solid;
+      animation-delay: 0s;
+    }
+
+    .wifi-signal::after {
+      width: 12px;
+      height: 12px;
+      top: 0;
+      left: 0;
+      border-style: dashed;
+      animation-delay: 0.5s;
+    }
+
+    .power-led {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 3px;
+      height: 3px;
+      background: #ff0000;
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: ledBlink 2s ease-in-out infinite;
+    }
+
+    @keyframes powerOff {
+      0%, 70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    @keyframes powerButton {
+      0%, 60% { opacity: 0; }
+      70% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+      80% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes bootUp {
+      0%, 70% { opacity: 0; background: linear-gradient(135deg, #0a0a0a, #1a1a1a); }
+      80% { opacity: 1; background: linear-gradient(135deg, #0056b3, #007bff); }
+      100% { opacity: 1; background: linear-gradient(135deg, #007bff, #0056b3); }
+    }
+
+    @keyframes codeScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-6px); }
+    }
+
+    @keyframes blink {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0; }
+    }
+
+    @keyframes steamRise {
+      0% { transform: translateY(0) scaleY(1); opacity: 0.6; }
+      100% { transform: translateY(-8px) scaleY(1.5); opacity: 0; }
+    }
+
+    @keyframes wifiPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.1); }
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes ledBlink {
+      0%, 60% { opacity: 0.3; background: #ff0000; }
+      70% { opacity: 1; background: #ffff00; }
+      80%, 100% { opacity: 1; background: #00ff00; }
+    }
+    /* Coffee cup animation for Breaks Today */
+    .coffee-container {
+      position: relative;
+      width: 100%;
+      height: 80px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(139,69,19,0.1) 0%, rgba(139,69,19,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .coffee-scene {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 60px;
+    }
+
+    .coffee-scene .desk {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(180deg, #8b4513, #654321);
+      border-radius: 2px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .coffee-cup-main {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 25px;
+      height: 30px;
+    }
+
+    .coffee-cup {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 25px;
+      background: linear-gradient(135deg, #8b4513, #654321);
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .coffee-cup::before {
+      content: '';
+      position: absolute;
+      top: -3px;
+      right: -4px;
+      width: 8px;
+      height: 12px;
+      border: 2px solid #654321;
+      border-left: none;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .coffee-cup::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      height: 4px;
+      background: linear-gradient(180deg, #3e2723, #5d4037);
+      border-radius: 2px;
+      opacity: 0.8;
+    }
+
+    .coffee-steam {
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 15px;
+      height: 20px;
+    }
+
+    .steam-particle {
+      position: absolute;
+      bottom: 0;
+      width: 3px;
+      height: 6px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: steamRise 3s ease-in-out infinite;
+    }
+
+    .steam-particle:nth-child(1) {
+      left: 20%;
+      animation-delay: 0s;
+      animation-duration: 2.5s;
+    }
+
+    .steam-particle:nth-child(2) {
+      left: 50%;
+      animation-delay: 0.5s;
+      animation-duration: 3s;
+    }
+
+    .steam-particle:nth-child(3) {
+      left: 80%;
+      animation-delay: 1s;
+      animation-duration: 2.8s;
+    }
+
+    .coffee-bubbles {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 4px;
+    }
+
+    .bubble {
+      position: absolute;
+      bottom: 0;
+      width: 2px;
+      height: 2px;
+      background: rgba(255,255,255,0.4);
+      border-radius: 50%;
+      animation: bubbleUp 2s ease-in-out infinite;
+    }
+
+    .bubble:nth-child(1) {
+      left: 20%;
+      animation-delay: 0s;
+    }
+
+    .bubble:nth-child(2) {
+      left: 50%;
+      animation-delay: 0.3s;
+    }
+
+    .bubble:nth-child(3) {
+      left: 80%;
+      animation-delay: 0.6s;
+    }
+
+    .coffee-handle {
+      position: absolute;
+      top: 8px;
+      right: -8px;
+      width: 8px;
+      height: 12px;
+      border: 2px solid #654321;
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+    }
+
+    @keyframes steamRise {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 0.6;
+      }
+      50% {
+        transform: translateY(-8px) scale(1.5);
+        opacity: 0.3;
+      }
+      100% {
+        transform: translateY(-15px) scale(2);
+        opacity: 0;
+      }
+    }
+
+    @keyframes bubbleUp {
+      0% {
+        transform: translateY(0) scale(0);
+        opacity: 0;
+      }
+      50% {
+        transform: translateY(-2px) scale(1);
+        opacity: 0.4;
+      }
+      100% {
+        transform: translateY(-4px) scale(0.5);
+        opacity: 0;
+      }
+    }
+    .toggle-btn{width:36px;height:36px;border-radius:8px;border:0;background:transparent;color:var(--muted);font-weight:700;display:inline-flex;align-items:center;justify-content:center;transition:transform 200ms ease}
+    .toggle-btn.open{transform:rotate(90deg)}
+    .settings{display:flex;gap:12px;align-items:center}
+    /* Compact work progress animation for Worked So Far */
+    .work-progress-container {
+      position: relative;
+      width: 100%;
+      height: 80px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(255,107,107,0.1) 0%, rgba(255,107,107,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .work-scene {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 50px;
+    }
+
+    .work-scene .desk {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(180deg, #8b4513, #654321);
+      border-radius: 2px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .progress-main {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 40px;
+    }
+
+    .progress-bar-container {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 45px;
+      height: 8px;
+      background: linear-gradient(180deg, #2c3e50, #34495e);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .progress-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 75%;
+      background: linear-gradient(90deg, #ff6b6b, #ff8e53, #ffd700);
+      border-radius: 4px;
+      animation: progressPulse 2s ease-in-out infinite;
+      box-shadow: 0 0 10px rgba(255,107,107,0.6);
+    }
+
+    .progress-bar-fill::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: shimmer 2s linear infinite;
+    }
+
+    .completion-badge {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 25px;
+      height: 25px;
+      background: linear-gradient(135deg, #ffd700, #ffed4e);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(255,215,0,0.4);
+      animation: badgeFloat 3s ease-in-out infinite;
+    }
+
+    .badge-star {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: #fff;
+      text-shadow: 0 0 4px rgba(255,255,255,0.8);
+      animation: starSpin 4s linear infinite;
+    }
+
+    .completion-rings {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 35px;
+      height: 35px;
+      pointer-events: none;
+    }
+
+    .ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 2px solid #ffd700;
+      border-radius: 50%;
+      opacity: 0;
+      animation: ringExpand 2s ease-out infinite;
+    }
+
+    .ring:nth-child(1) { animation-delay: 0s; }
+    .ring:nth-child(2) { animation-delay: 0.5s; }
+    .ring:nth-child(3) { animation-delay: 1s; }
+
+    .mini-chart {
+      position: absolute;
+      bottom: 12px;
+      left: -12px;
+      width: 12px;
+      height: 15px;
+      display: flex;
+      gap: 1px;
+      align-items: flex-end;
+    }
+
+    .mini-bar {
+      flex: 1;
+      background: linear-gradient(180deg, #ff6b6b, #ff8e53);
+      border-radius: 1px;
+      animation: miniBarGrow 1.5s ease-in-out infinite;
+    }
+
+    .mini-bar:nth-child(1) { height: 40%; animation-delay: 0s; }
+    .mini-bar:nth-child(2) { height: 60%; animation-delay: 0.2s; }
+    .mini-bar:nth-child(3) { height: 80%; animation-delay: 0.4s; }
+    .mini-bar:nth-child(4) { height: 100%; animation-delay: 0.6s; }
+
+    .time-indicators {
+      position: absolute;
+      bottom: 12px;
+      right: -12px;
+      width: 12px;
+      height: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .time-dot {
+      flex: 1;
+      background: linear-gradient(135deg, #2c3e50, #34495e);
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .time-dot.completed::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, #ffd700, #ffed4e);
+      animation: dotFill 1.5s ease-in-out infinite;
+    }
+
+    .time-dot:nth-child(1).completed::before { animation-delay: 0s; }
+    .time-dot:nth-child(2).completed::before { animation-delay: 0.3s; }
+    .time-dot:nth-child(3).completed::before { animation-delay: 0.6s; }
+
+    .sparkles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+
+    .sparkle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: #ffd700;
+      border-radius: 50%;
+      animation: sparkleFloat 2s ease-in-out infinite;
+    }
+
+    .sparkle:nth-child(1) { top: 10%; left: 20%; animation-delay: 0s; }
+    .sparkle:nth-child(2) { top: 15%; left: 70%; animation-delay: 0.4s; }
+    .sparkle:nth-child(3) { top: 60%; left: 30%; animation-delay: 0.8s; }
+    .sparkle:nth-child(4) { top: 40%; left: 80%; animation-delay: 1.2s; }
+
+    @keyframes progressPulse {
+      0%, 100% { width: 75%; box-shadow: 0 0 10px rgba(255,107,107,0.6); }
+      50% { width: 85%; box-shadow: 0 0 15px rgba(255,107,107,0.9); }
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    @keyframes badgeFloat {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-3px); }
+    }
+
+    @keyframes starSpin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes ringExpand {
+      0% { width: 25px; height: 25px; opacity: 0; border-width: 3px; }
+      50% { opacity: 1; }
+      100% { width: 40px; height: 40px; opacity: 0; border-width: 1px; }
+    }
+
+    @keyframes miniBarGrow {
+      0%, 100% { transform: scaleY(0.7); opacity: 0.7; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    @keyframes dotFill {
+      0%, 100% { transform: scale(0); opacity: 0; }
+      50% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes sparkleFloat {
+      0%, 100% { transform: translateY(0) scale(0); opacity: 0; }
+      50% { transform: translateY(-8px) scale(1); opacity: 1; }
+    }
+
+    /* Worked So Far uses the same base styling as other stats (no extra box styling) */
+    /* #workedSoFar left intentionally unstyled here so it matches Started At / Remaining / Expected Leave */
+
+    @keyframes progressRotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes chartGrow {
+      0%, 100% { transform: scaleY(0.8); opacity: 0.7; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    @keyframes fillBlock {
+      0%, 100% { transform: translateY(100%); }
+      50% { transform: translateY(0); }
+    }
+
+    @keyframes hourRotate {
+      0% { transform: translate(-50%, -100%) rotate(0deg); }
+      100% { transform: translate(-50%, -100%) rotate(360deg); }
+    }
+
+    @keyframes minuteRotate {
+      0% { transform: translate(-50%, -100%) rotate(0deg); }
+      100% { transform: translate(-50%, -100%) rotate(360deg); }
+    }
+
+    @keyframes sparkleFloat {
+      0%, 100% { transform: translateY(0) scale(0); opacity: 0; }
+      50% { transform: translateY(-10px) scale(1); opacity: 1; }
+    }
+
+    /* Text animation keyframes removed for clean appearance */
+
+    /* Bike rider animation for Expected Leave */
+    .bike-container {
+      position: relative;
+      width: 100%;
+      height: 80px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(135,206,235,0.15) 0%, rgba(135,206,235,0.05) 50%, rgba(169,169,169,0.1) 100%);
+      border-radius: 8px;
+    }
+
+    .bike-rider {
+      position: absolute;
+      bottom: 0;
+      left: -120px;
+      animation: rideAcross 5s ease-in-out infinite;
+    }
+
+    .bike {
+      position: relative;
+      width: 90px;
+      height: 55px;
+    }
+
+    .wheel {
+      position: absolute;
+      bottom: 0;
+      width: 22px;
+      height: 22px;
+      border: 3px solid #1a1a1a;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #f0f0f0 0%, #d0d0d0 50%, #a0a0a0 100%);
+      animation: wheelRotate 0.4s linear infinite;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .wheel::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 2px;
+      background: #1a1a1a;
+    }
+
+    .wheel::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      height: 2px;
+      background: #1a1a1a;
+      animation: spokeRotate 0.4s linear infinite;
+    }
+
+    .wheel.back { left: 8px; }
+    .wheel.front { right: 8px; }
+
+    .bike-frame {
+      position: absolute;
+      bottom: 11px;
+      left: 18px;
+      width: 54px;
+      height: 28px;
+      border: 3px solid #c41e3a;
+      border-left: none;
+      border-top: none;
+      border-radius: 0 0 28px 0;
+      transform: skewX(-3deg);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .bike-frame::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -18px;
+      width: 18px;
+      height: 3px;
+      background: #c41e3a;
+      transform: rotate(-25deg);
+      transform-origin: right center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .bike-frame::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 18px;
+      height: 3px;
+      background: #c41e3a;
+      transform: rotate(40deg);
+      transform-origin: left center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .bike-seat {
+      position: absolute;
+      bottom: 28px;
+      left: 30px;
+      width: 18px;
+      height: 6px;
+      background: linear-gradient(180deg, #2c3e50, #1a1a1a);
+      border-radius: 3px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .bike-handlebar {
+      position: absolute;
+      bottom: 28px;
+      right: 15px;
+      width: 18px;
+      height: 4px;
+      background: linear-gradient(180deg, #2c3e50, #1a1a1a);
+    }
+    .computer-icon {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      width: 60px;
+      position: relative;
+      transform-style: preserve-3d;
+      perspective: 1000px;
+      animation: float 3s ease-in-out infinite;
+    }
+    .computer-icon .monitor {
+      width: 60px;
+      height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #1a1d22, #2a2e34);
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 15px 40px rgba(0, 255, 200, 0.3);
+      overflow: hidden;
+      transform: translateY(-4px) rotateX(5deg) rotateY(5deg) translateZ(10px);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: monitorGlow 2s infinite alternate;
+    }
+    .computer-icon .screen {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      top: 4px;
+      height: 24px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #8ed5ff, #00d4ff);
+      opacity: 1;
+      overflow: hidden;
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 255, 200, 0.5);
+      animation: screenPulse 3s infinite alternate;
+    }
+    .computer-icon .screen::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.6) 50%,
+        rgba(255,255,255,0) 100%
+      );
+      transform: translateX(-100%) skewX(-15deg);
+      animation: screenShine 2.5s infinite 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* Matrix-like code rain effect */
+    .computer-icon .screen::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 10%),
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 255, 200, 0.1) 0px,
+          rgba(0, 255, 200, 0.1) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+      background-size: 100% 100%, 100% 20px;
+      animation: matrixRain 0.8s steps(10) infinite;
+      opacity: 1;
+    }
+    .computer-icon .led {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00ffc8;
+      opacity: 1;
+      box-shadow: 0 0 10px #00ffc8;
+      filter: drop-shadow(0 0 5px #00ffc8);
+      animation: ledPulse 1s infinite alternate;
+    }
+    .computer-icon .stand {
+      width: 24px;
+      height: 8px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, #1a1d22, #2a2e34);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      position: relative;
+      z-index: 1;
+      transform-style: preserve-3d;
+      transform: translateZ(-5px);
+    }
+    .computer-icon .base {
+      width: 50px;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #1a1d22, #2a2e34);
+      margin-top: -4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transform: translateZ(-10px);
+    }
+    /* Active state */
+    .computer-icon.active {
+      animation: float 3s ease-in-out infinite;
+    }
+    .computer-icon.active .monitor {
+      box-shadow: 0 15px 40px rgba(0, 255, 200, 0.3);
+      transform: translateY(-4px) rotateX(5deg) rotateY(5deg);
+      animation: monitorGlow 2s infinite alternate;
+    }
+    .computer-icon.active .screen {
+      opacity: 1;
+      animation: screenPulse 3s infinite alternate;
+    }
+    .computer-icon.active .screen::after {
+      opacity: 1;
+    }
+    .computer-icon.active .led {
+      opacity: 1;
+      animation: ledPulse 1s infinite alternate;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-6px) rotate(2deg); }
+    }
+    @keyframes monitorGlow {
+      0% { box-shadow: 0 10px 30px rgba(0, 255, 200, 0.2); }
+      100% { box-shadow: 0 20px 50px rgba(0, 255, 200, 0.4); }
+    }
+    @keyframes screenPulse {
+      0% { 
+        box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 255, 200, 0.5);
+        filter: hue-rotate(0deg);
+      }
+      50% { 
+        box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 200, 0.8);
+        filter: hue-rotate(10deg);
+      }
+      100% { 
+        box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3), 0 0 10px rgba(0, 255, 200, 0.5);
+        filter: hue-rotate(0deg);
+      }
+    }
+    @keyframes ledPulse {
+      0% { 
+        transform: scale(1);
+        box-shadow: 0 0 5px #00ffc8, 0 0 10px #00ffc8;
+      }
+      100% { 
+        transform: scale(1.2);
+        box-shadow: 0 0 15px #00ffc8, 0 0 30px #00ffc8;
+      }
+    }
+    @keyframes screenShine {
+      0% { transform: translateX(-100%) skewX(-15deg); }
+      100% { transform: translateX(200%) skewX(-15deg); }
+    }
+    @keyframes matrixRain {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 0 100%, 0 100%; }
+    }
+    .modal-like{padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,240,240,0.6), rgba(255,245,240,0.3));}
+    input,select{padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.03);color:inherit}
+    label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+    .row{display:flex;gap:12px}
+    .small{font-size:13px;color:var(--muted)}
+    .footer{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-top:40px;
+      padding:20px;
+      border-radius:16px 16px 0 0;
+      background:linear-gradient(135deg,var(--crystal),var(--glass));
+      border:1px solid var(--shadow-glass);
+      box-shadow:0 8px 32px var(--shadow-light),inset 0 1px 0 rgba(255,255,255,0.3);
+      backdrop-filter:blur(15px);
+      -webkit-backdrop-filter:blur(15px);
+      gap:18px;
+    }
+    .note{font-size:12px;color:var(--muted)}
+    .modal-like{padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,240,240,0.6), rgba(255,245,240,0.3));}
+    
+    /* Fiery background for Worked So Far - REMOVED */
+    /* Animation styles removed for clean, simple appearance */
+
+    /* Car animation for Expected Leave */
+    .car-container {
+      position: relative;
+      width: 100%;
+      height: 80px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(135,206,235,0.15) 0%, rgba(135,206,235,0.05) 50%, rgba(169,169,169,0.1) 100%);
+      border-radius: 8px;
+    }
+
+    .car {
+      position: absolute;
+      bottom: 8px;
+      left: -80px;
+      animation: driveAcross 6s ease-in-out infinite;
+    }
+
+    .car-body {
+      position: relative;
+      width: 60px;
+      height: 25px;
+      background: linear-gradient(180deg, #e74c3c, #c0392b);
+      border-radius: 8px 8px 4px 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .car-roof {
+      position: absolute;
+      top: -12px;
+      left: 8px;
+      width: 35px;
+      height: 15px;
+      background: linear-gradient(180deg, #c0392b, #a93226);
+      border-radius: 8px 8px 0 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .car-window {
+      position: absolute;
+      top: 2px;
+      left: 10px;
+      width: 28px;
+      height: 8px;
+      background: linear-gradient(135deg, #87ceeb, #4682b4);
+      border-radius: 4px;
+      opacity: 0.8;
+    }
+
+    .car-wheel {
+      position: absolute;
+      bottom: -6px;
+      width: 12px;
+      height: 12px;
+      background: linear-gradient(180deg, #2c3e50, #34495e);
+      border-radius: 50%;
+      border: 2px solid #7f8c8d;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .car-wheel.front {
+      left: 8px;
+      animation: wheelRotate 0.5s linear infinite;
+    }
+
+    .car-wheel.rear {
+      right: 8px;
+      animation: wheelRotate 0.5s linear infinite;
+    }
+
+    .car-wheel::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 4px;
+      height: 4px;
+      background: #95a5a6;
+      border-radius: 50%;
+    }
+
+    .car-headlight {
+      position: absolute;
+      top: 8px;
+      right: -2px;
+      width: 4px;
+      height: 6px;
+      background: linear-gradient(135deg, #fffacd, #ffffe0);
+      border-radius: 2px;
+      box-shadow: 0 0 4px rgba(255,250,205,0.8);
+      animation: headlightGlow 1s ease-in-out infinite;
+    }
+
+    .car-taillight {
+      position: absolute;
+      top: 8px;
+      left: -2px;
+      width: 3px;
+      height: 6px;
+      background: linear-gradient(135deg, #ff6b6b, #ff4444);
+      border-radius: 2px;
+      box-shadow: 0 0 4px rgba(255,107,107,0.8);
+      animation: taillightGlow 1s ease-in-out infinite;
+    }
+
+    .ground {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: linear-gradient(180deg, #696969, #808080);
+      border-radius: 2px;
+    }
+
+    .road-line {
+      position: absolute;
+      bottom: 3px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: repeating-linear-gradient(
+        90deg,
+        #ffd700 0px,
+        #ffd700 10px,
+        transparent 10px,
+        transparent 20px
+      );
+      animation: roadMove 2s linear infinite;
+    }
+
+    @keyframes driveAcross {
+      0% { left: -80px; }
+      100% { left: 100%; }
+    }
+
+    @keyframes wheelRotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes headlightGlow {
+      0%, 100% { opacity: 0.8; box-shadow: 0 0 4px rgba(255,250,205,0.8); }
+      50% { opacity: 1; box-shadow: 0 0 8px rgba(255,250,205,1); }
+    }
+
+    @keyframes taillightGlow {
+      0%, 100% { opacity: 0.8; box-shadow: 0 0 4px rgba(255,107,107,0.8); }
+      50% { opacity: 1; box-shadow: 0 0 8px rgba(255,107,107,1); }
+    }
+
+    @keyframes roadMove {
+      0% { background-position: 0 0; }
+      100% { background-position: 20px 0; }
+    }
+
+    /* Thinking person animation for Remaining */
+    .thinking-container {
+      position: relative;
+      width: 100%;
+      height: 80px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(255,223,186,0.2) 0%, rgba(255,223,186,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .thinking-person {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 70px;
+    }
+
+    .person {
+      position: relative;
+      width: 30px;
+      height: 50px;
+      margin: 0 auto;
+    }
+
+    .person-head {
+      position: absolute;
+      top: 0;
+      left: 10px;
+      width: 10px;
+      height: 10px;
+      background: linear-gradient(135deg, #fdbcb4, #f4a460);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      animation: headNod 2s ease-in-out infinite;
+    }
+
+    .person-body {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      width: 6px;
+      height: 20px;
+      background: linear-gradient(180deg, #9b59b6, #8e44ad);
+      border-radius: 3px 3px 0 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .person-arm {
+      position: absolute;
+      width: 12px;
+      height: 3px;
+      background: linear-gradient(90deg, #fdbcb4, #f4a460);
+      border-radius: 2px;
+      top: 15px;
+      transform-origin: center;
+    }
+
+    .person-arm.left {
+      left: 5px;
+      transform: rotate(45deg);
+      animation: thinkArmLeft 2s ease-in-out infinite;
+    }
+
+    .person-arm.right {
+      right: 5px;
+      transform: rotate(-45deg);
+      animation: thinkArmRight 2s ease-in-out infinite;
+    }
+
+    .thought-bubble {
+      position: absolute;
+      top: -20px;
+      right: -15px;
+      animation: bubbleFloat 3s ease-in-out infinite;
+    }
+
+    .bubble {
+      width: 25px;
+      height: 20px;
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    .bubble::before {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 5px;
+      width: 8px;
+      height: 8px;
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 2px;
+      width: 4px;
+      height: 4px;
+      background: linear-gradient(135deg, #ffffff, #f0f0f0);
+      border-radius: 50%;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .idea {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 12px;
+      animation: ideaPulse 1s ease-in-out infinite;
+    }
+
+    .productivity-bars {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 15px;
+      display: flex;
+      gap: 2px;
+      padding: 0 5px;
+    }
+
+    .bar {
+      flex: 1;
+      background: linear-gradient(180deg, #f39c12, #e67e22);
+      border-radius: 2px;
+      transform-origin: bottom;
+      animation: barGrow 2s ease-in-out infinite;
+    }
+
+    .bar:nth-child(1) { animation-delay: 0s; }
+    .bar:nth-child(2) { animation-delay: 0.2s; }
+    .bar:nth-child(3) { animation-delay: 0.4s; }
+    .bar:nth-child(4) { animation-delay: 0.6s; }
+    .bar:nth-child(5) { animation-delay: 0.8s; }
+
+    .clock-icon {
+      position: absolute;
+      top: -35px;
+      left: -15px;
+      width: 20px;
+      height: 20px;
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      animation: clockTick 1s steps(60) infinite;
+    }
+
+    .clock-icon::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 6px;
+      background: white;
+      transform-origin: center bottom;
+      animation: hourHand 4s linear infinite;
+    }
+
+    .clock-icon::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 8px;
+      background: white;
+      transform-origin: center bottom;
+      animation: minuteHand 1s linear infinite;
+    }
+
+    @keyframes headNod {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
+    @keyframes thinkArmLeft {
+      0%, 100% { transform: rotate(45deg); }
+      50% { transform: rotate(60deg); }
+    }
+
+    @keyframes thinkArmRight {
+      0%, 100% { transform: rotate(-45deg); }
+      50% { transform: rotate(-60deg); }
+    }
+
+    @keyframes bubbleFloat {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-5px) scale(1.05); }
+    }
+
+    @keyframes ideaPulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+    }
+
+    @keyframes barGrow {
+      0%, 100% { transform: scaleY(0.3); }
+      50% { transform: scaleY(1); }
+    }
+
+    @keyframes clockTick {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes hourHand {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes minuteHand {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Mosquito Chase Animation for Worked So Far */
+    .mosquito-chase-container {
+      position: relative;
+      width: 100%;
+      height: 110px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(255,165,0,0.1) 0%, rgba(255,140,0,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .chase-scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chasing-human {
+      position: absolute;
+      bottom: 15px;
+      left: -50px;
+      width: 40px;
+      height: 70px;
+      animation: humanChasePath 6s ease-in-out infinite;
+    }
+
+    .human-figure-chasing {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      animation: humanChaseBody 6s ease-in-out infinite;
+    }
+
+    .human-head-chasing {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 15px;
+      height: 15px;
+      background: linear-gradient(135deg, #fdbcb4, #ffb6c1);
+      border-radius: 50%;
+      animation: headChaseBob 0.5s ease-in-out infinite;
+    }
+
+    .human-face-chasing {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 11px;
+    }
+
+    .human-eyes-chasing {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 3px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .human-eye-chasing {
+      position: relative;
+      width: 2px;
+      height: 2px;
+      background: white;
+      border-radius: 50%;
+      border: 1px solid #333;
+      animation: eyeChaseFocus 0.3s ease-in-out infinite;
+    }
+
+    .eye-pupil-chasing {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 1px;
+      background: black;
+      border-radius: 50%;
+    }
+
+    .human-nose-chasing {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 1px;
+      background: rgba(139,69,19,0.3);
+      border-radius: 50%;
+    }
+
+    .human-mouth-chasing.frustrated {
+      position: absolute;
+      bottom: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 2px;
+      background: #333;
+      border-radius: 1px;
+      animation: mouthFrustrated 0.4s ease-in-out infinite;
+    }
+
+    .human-hair-chasing {
+      position: absolute;
+      top: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 13px;
+      height: 5px;
+    }
+
+    .hair-strand-chasing {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: #4a4a4a;
+      border-radius: 50%;
+      animation: hairChaseMessy 0.6s ease-in-out infinite;
+    }
+
+    .strand1 { left: 1px; animation-delay: 0s; }
+    .strand2 { left: 5px; animation-delay: 0.2s; }
+    .strand3 { left: 9px; animation-delay: 0.4s; }
+
+    .human-torso-chasing {
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 25px;
+      background: linear-gradient(180deg, #4169e1, #1e3a8a);
+      border-radius: 6px 6px 3px 3px;
+      animation: torsoChaseLean 0.5s ease-in-out infinite;
+    }
+
+    .human-chest-chasing {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 20px;
+      background: linear-gradient(180deg, #6495ed, #4169e1);
+      border-radius: 3px;
+    }
+
+    .human-arms-chasing {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 35px;
+      height: 15px;
+    }
+
+    .human-arm-chasing {
+      position: absolute;
+      width: 2px;
+      height: 18px;
+      background: linear-gradient(180deg, #fdbcb4, #ffb6c1);
+      border-radius: 1px;
+      transform-origin: top center;
+    }
+
+    .human-arm-chasing.swinging-bat {
+      animation: armSwingBat 0.4s ease-in-out infinite;
+    }
+
+    .human-arm-chasing.reaching {
+      animation: armReach 0.4s ease-in-out infinite;
+    }
+
+    .human-arm-chasing.left {
+      left: 2px;
+    }
+
+    .human-arm-chasing.right {
+      right: 2px;
+    }
+
+    .human-legs-chasing {
+      position: absolute;
+      top: 35px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 25px;
+    }
+
+    .human-leg-chasing {
+      position: absolute;
+      width: 3px;
+      height: 20px;
+      background: linear-gradient(180deg, #2c3e50, #34495e);
+      border-radius: 1px;
+      transform-origin: top center;
+    }
+
+    .human-leg-chasing.running-chase {
+      animation: legChaseRun 0.3s ease-in-out infinite;
+    }
+
+    .human-leg-chasing.left {
+      left: 4px;
+      animation-delay: 0s;
+    }
+
+    .human-leg-chasing.right {
+      right: 4px;
+      animation-delay: 0.15s;
+    }
+
+    .chase-shadow {
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 25px;
+      height: 6px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 50%;
+      animation: chaseShadowFollow 6s ease-in-out infinite;
+    }
+
+    .mosquito {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      width: 15px;
+      height: 20px;
+      animation: mosquitoFly 6s ease-in-out infinite;
+    }
+
+    .mosquito-body {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .mosquito-head {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      background: #333;
+      border-radius: 50%;
+    }
+
+    .mosquito-thorax {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 5px;
+      background: #666;
+      border-radius: 2px;
+    }
+
+    .mosquito-abdomen {
+      position: absolute;
+      top: 7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 8px;
+      background: linear-gradient(180deg, #666, #333);
+      border-radius: 1px;
+    }
+
+    .mosquito-wings {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 8px;
+    }
+
+    .wing {
+      position: absolute;
+      width: 6px;
+      height: 4px;
+      background: rgba(255,255,255,0.7);
+      border-radius: 50%;
+      border: 1px solid rgba(200,200,200,0.5);
+    }
+
+    .wing.left-wing {
+      left: 0;
+      animation: wingFlapLeft 0.1s linear infinite;
+    }
+
+    .wing.right-wing {
+      right: 0;
+      animation: wingFlapRight 0.1s linear infinite;
+    }
+
+    .mosquito-legs {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 10px;
+    }
+
+    .leg {
+      position: absolute;
+      width: 1px;
+      height: 4px;
+      background: #333;
+      border-radius: 0.5px;
+    }
+
+    .leg.front-left { top: 0; left: 2px; transform: rotate(-20deg); }
+    .leg.front-right { top: 0; right: 2px; transform: rotate(20deg); }
+    .leg.middle-left { top: 2px; left: 1px; transform: rotate(-10deg); }
+    .leg.middle-right { top: 2px; right: 1px; transform: rotate(10deg); }
+    .leg.back-left { bottom: 0; left: 2px; transform: rotate(-30deg); }
+    .leg.back-right { bottom: 0; right: 2px; transform: rotate(30deg); }
+
+    .mosquito-proboscis {
+      position: absolute;
+      top: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1px;
+      height: 3px;
+      background: #333;
+      border-radius: 0.5px;
+    }
+
+    .mosquito-bat {
+      position: absolute;
+      bottom: 30px;
+      left: 20px;
+      width: 25px;
+      height: 30px;
+      animation: batSwing 6s ease-in-out infinite;
+    }
+
+    .bat-handle {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 20px;
+      background: linear-gradient(180deg, #8b4513, #654321);
+      border-radius: 1px;
+    }
+
+    .bat-head {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 15px;
+    }
+
+    .bat-mesh {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 1px,
+        rgba(100,100,100,0.3) 1px,
+        rgba(100,100,100,0.3) 2px
+      );
+      border-radius: 50% 50% 40% 40%;
+    }
+
+    .bat-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 1px solid #666;
+      border-radius: 50% 50% 40% 40%;
+    }
+
+    .chase-effects {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .motion-lines-chase {
+      position: absolute;
+      top: 30px;
+      left: 20px;
+      width: 60px;
+      height: 40px;
+    }
+
+    .chase-line {
+      position: absolute;
+      width: 15px;
+      height: 2px;
+      background: rgba(255,140,0,0.6);
+      border-radius: 1px;
+      opacity: 0;
+      animation: chaseMotionBlur 6s ease-in-out infinite;
+    }
+
+    .line1 { top: 5px; left: 0; animation-delay: 1s; }
+    .line2 { top: 15px; left: 10px; animation-delay: 1.2s; }
+    .line3 { top: 25px; left: 20px; animation-delay: 1.4s; }
+    .line4 { top: 35px; left: 30px; animation-delay: 1.6s; }
+
+    .buzz-waves {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      width: 40px;
+      height: 40px;
+    }
+
+    .buzz-wave {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(100,100,100,0.4);
+      border-radius: 50%;
+      opacity: 0;
+      animation: buzzSound 0.5s ease-out infinite;
+    }
+
+    .wave1 { top: 0; left: 0; animation-delay: 0s; }
+    .wave2 { top: 10px; left: 10px; animation-delay: 0.15s; }
+    .wave3 { top: 20px; left: 20px; animation-delay: 0.3s; }
+
+    .miss-swirls {
+      position: absolute;
+      bottom: 40px;
+      right: 40px;
+      width: 30px;
+      height: 30px;
+    }
+
+    .swirl {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(255,69,0,0.6);
+      border-radius: 50%;
+      border-top-color: transparent;
+      border-right-color: transparent;
+      opacity: 0;
+      animation: missSwirl 6s ease-in-out infinite;
+    }
+
+    .swirl1 { top: 0; left: 0; animation-delay: 2s; }
+    .swirl2 { top: 10px; left: 10px; animation-delay: 3s; }
+    .swirl3 { top: 20px; left: 5px; animation-delay: 4s; }
+
+    .chase-status-text {
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      width: 100px;
+      height: 25px;
+      opacity: 0;
+      animation: chaseStatusShow 6s ease-in-out infinite;
+    }
+
+    .status-bubble-chase {
+      background: linear-gradient(135deg, #fff, #f0f0f0);
+      border-radius: 12px;
+      padding: 4px 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 600;
+      color: #333;
+      animation: chaseBubbleWobble 2s ease-in-out infinite;
+    }
+
+    .status-emoji-chase {
+      font-size: 9px;
+      animation: chaseEmojiPulse 1.5s ease-in-out infinite;
+    }
+
+    .status-message-chase {
+      font-size: 9px;
+      margin: 0 2px;
+    }
+
+    .walk-scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .walking-human {
+      position: absolute;
+      bottom: 20px;
+      left: -60px;
+      width: 40px;
+      height: 70px;
+      animation: humanWalkPath 8s ease-in-out infinite;
+    }
+
+    .human-figure {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      animation: humanBodyMove 8s ease-in-out infinite;
+    }
+
+    .human-head {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, #fdbcb4, #ffb6c1);
+      border-radius: 50%;
+      animation: headBob 1s ease-in-out infinite;
+    }
+
+    .human-face {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+    }
+
+    .human-eyes {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 10px;
+      height: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .human-eye {
+      position: relative;
+      width: 3px;
+      height: 3px;
+      background: white;
+      border-radius: 50%;
+      border: 1px solid #333;
+    }
+
+    .eye-pupil {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1px;
+      height: 1px;
+      background: black;
+      border-radius: 50%;
+      animation: pupilLook 3s ease-in-out infinite;
+    }
+
+    .human-nose {
+      position: absolute;
+      top: 7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 2px;
+      background: rgba(139,69,19,0.3);
+      border-radius: 50%;
+    }
+
+    .human-mouth {
+      position: absolute;
+      bottom: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 1px;
+      background: #333;
+      border-radius: 50%;
+    }
+
+    .human-hair {
+      position: absolute;
+      top: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 6px;
+    }
+
+    .hair-strand {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #4a4a4a;
+      border-radius: 50% 50% 50% 50%;
+    }
+
+    .strand1 { left: 2px; animation: hairSway 2s ease-in-out infinite; }
+    .strand2 { left: 6px; animation: hairSway 2s ease-in-out infinite 0.5s; }
+    .strand3 { left: 10px; animation: hairSway 2s ease-in-out infinite 1s; }
+
+    .human-torso {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 30px;
+      background: linear-gradient(180deg, #4169e1, #1e3a8a);
+      border-radius: 8px 8px 4px 4px;
+      animation: torsoSway 1s ease-in-out infinite;
+    }
+
+    .human-chest {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 20px;
+      background: linear-gradient(180deg, #6495ed, #4169e1);
+      border-radius: 4px;
+    }
+
+    .human-arms {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 35px;
+      height: 12px;
+    }
+
+    .human-arm {
+      position: absolute;
+      width: 3px;
+      height: 20px;
+      background: linear-gradient(180deg, #fdbcb4, #ffb6c1);
+      border-radius: 2px;
+      transform-origin: top center;
+    }
+
+    .human-arm.left {
+      left: 2px;
+      animation: armSwingLeft 1s ease-in-out infinite;
+    }
+
+    .human-arm.right {
+      right: 2px;
+      animation: armSwingRight 1s ease-in-out infinite 0.5s;
+    }
+
+    .human-legs {
+      position: absolute;
+      top: 42px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 18px;
+      height: 25px;
+    }
+
+    .human-leg {
+      position: absolute;
+      width: 4px;
+      height: 22px;
+      background: linear-gradient(180deg, #4169e1, #1e3a8a);
+      border-radius: 2px;
+      transform-origin: top center;
+    }
+
+    .human-leg.left {
+      left: 3px;
+      animation: legStepLeft 1s ease-in-out infinite;
+    }
+
+    .human-leg.right {
+      right: 3px;
+      animation: legStepRight 1s ease-in-out infinite 0.5s;
+    }
+
+    .walking-shadow {
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 6px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 50%;
+      animation: shadowFollow 8s ease-in-out infinite;
+    }
+
+    .ground-path {
+      position: absolute;
+      bottom: 15px;
+      left: 0;
+      width: 100%;
+      height: 20px;
+    }
+
+    .footprint {
+      position: absolute;
+      width: 8px;
+      height: 12px;
+      background: rgba(100,100,100,0.3);
+      border-radius: 50% 50% 40% 40%;
+      opacity: 0;
+      animation: footprintAppear 8s ease-in-out infinite;
+    }
+
+    .print1 { left: 10%; animation-delay: 1s; }
+    .print2 { left: 25%; animation-delay: 2s; }
+    .print3 { left: 45%; animation-delay: 3s; }
+    .print4 { left: 60%; animation-delay: 4s; }
+    .print5 { left: 75%; animation-delay: 5s; }
+    .print6 { left: 85%; animation-delay: 6s; }
+
+    .fall-effects {
+      position: absolute;
+      bottom: 10px;
+      right: 20px;
+      width: 60px;
+      height: 40px;
+      opacity: 0;
+      animation: fallEffectsAppear 8s ease-in-out infinite;
+    }
+
+    .dust-clouds {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      width: 100%;
+      height: 30px;
+    }
+
+    .dust-cloud {
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      background: rgba(150,150,150,0.4);
+      border-radius: 50%;
+      animation: dustExpand 1s ease-out infinite;
+    }
+
+    .cloud1 { left: 5px; animation-delay: 0s; }
+    .cloud2 { left: 20px; animation-delay: 0.3s; }
+    .cloud3 { left: 35px; animation-delay: 0.6s; }
+
+    .impact-stars {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 20px;
+    }
+
+    .impact-star {
+      position: absolute;
+      font-size: 12px;
+      animation: starBurst 1s ease-out infinite;
+    }
+
+    .star1 { left: 10px; animation-delay: 0s; }
+    .star2 { left: 25px; animation-delay: 0.2s; }
+    .star3 { left: 40px; animation-delay: 0.4s; }
+
+    .status-text {
+      position: absolute;
+      top: 10px;
+      left: 15px;
+      width: 120px;
+      height: 25px;
+    }
+
+    .status-bubble {
+      background: linear-gradient(135deg, #fff, #f0f0f0);
+      border-radius: 15px;
+      padding: 5px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #333;
+      animation: statusUpdate 8s ease-in-out infinite;
+    }
+
+    .status-emoji {
+      font-size: 12px;
+      margin-right: 5px;
+    }
+
+    .status-message {
+      font-size: 10px;
+    }
+
+    /* Human Walking Animation Keyframes */
+    @keyframes humanWalkPath {
+      0% { left: -60px; bottom: 20px; }
+      20% { left: 15%; bottom: 25px; }
+      40% { left: 35%; bottom: 15px; }
+      60% { left: 55%; bottom: 30px; }
+      75% { left: 70%; bottom: 10px; transform: rotate(15deg); }
+      85% { left: 80%; bottom: 5px; transform: rotate(45deg); }
+      90% { left: 85%; bottom: 0px; transform: rotate(90deg); }
+      95% { left: 87%; bottom: 0px; transform: rotate(180deg); }
+      100% { left: 87%; bottom: 0px; transform: rotate(360deg); }
+    }
+
+    @keyframes humanBodyMove {
+      0%, 20%, 40%, 60% { transform: translateY(0) rotate(0deg); }
+      75% { transform: translateY(-5px) rotate(15deg); }
+      85% { transform: translateY(-10px) rotate(45deg); }
+      90% { transform: translateY(-15px) rotate(90deg); }
+      95% { transform: translateY(-20px) rotate(180deg); }
+      100% { transform: translateY(-25px) rotate(360deg); }
+    }
+
+    @keyframes headBob {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-2px); }
+    }
+
+    @keyframes hairSway {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(5deg); }
+    }
+
+    @keyframes torsoSway {
+      0%, 100% { transform: translateX(-50%) rotate(0deg); }
+      25% { transform: translateX(-50%) rotate(2deg); }
+      75% { transform: translateX(-50%) rotate(-2deg); }
+    }
+
+    @keyframes armSwingLeft {
+      0%, 100% { transform: rotate(-20deg); }
+      50% { transform: rotate(20deg); }
+    }
+
+    @keyframes armSwingRight {
+      0%, 100% { transform: rotate(20deg); }
+      50% { transform: rotate(-20deg); }
+    }
+
+    @keyframes legStepLeft {
+      0%, 100% { transform: rotate(-15deg); }
+      50% { transform: rotate(15deg); }
+    }
+
+    @keyframes legStepRight {
+      0%, 100% { transform: rotate(15deg); }
+      50% { transform: rotate(-15deg); }
+    }
+
+    @keyframes pupilLook {
+      0%, 100% { transform: translate(-50%, -50%); }
+      25% { transform: translate(-30%, -50%); }
+      75% { transform: translate(-70%, -50%); }
+    }
+
+    @keyframes shadowFollow {
+      0% { left: -60px; opacity: 0.3; }
+      20% { left: 15%; opacity: 0.4; }
+      40% { left: 35%; opacity: 0.3; }
+      60% { left: 55%; opacity: 0.5; }
+      75% { left: 70%; opacity: 0.6; }
+      85% { left: 80%; opacity: 0.8; }
+      90%, 100% { left: 85%; opacity: 0.2; }
+    }
+
+    @keyframes footprintAppear {
+      0%, 85% { opacity: 0; }
+      86%, 92% { opacity: 0.6; }
+      93%, 100% { opacity: 0; }
+    }
+
+    @keyframes fallEffectsAppear {
+      0%, 84% { opacity: 0; }
+      85%, 95% { opacity: 1; }
+      96%, 100% { opacity: 0; }
+    }
+
+    @keyframes dustExpand {
+      0% { transform: scale(0.5); opacity: 0.8; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    @keyframes starBurst {
+      0% { transform: scale(0) rotate(0deg); opacity: 1; }
+      50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+      100% { transform: scale(0.5) rotate(360deg); opacity: 0; }
+    }
+
+    @keyframes statusUpdate {
+      0%, 70% { 
+        background: linear-gradient(135deg, #fff, #f0f0f0);
+        transform: scale(1);
+      }
+      71%, 85% { 
+        background: linear-gradient(135deg, #ffebee, #ffcdd2);
+        transform: scale(1.05);
+      }
+      86%, 95% { 
+        background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+        transform: scale(1.1);
+      }
+      96%, 100% { 
+        background: linear-gradient(135deg, #fff, #f0f0f0);
+        transform: scale(1);
+      }
+    }
+
+    /* Comedy Realistic Sleeping Animation for Remaining Section */
+    .sleeping-container {
+      position: relative;
+      width: 100%;
+      height: 120px;
+      overflow: hidden;
+      margin-top: 10px;
+      background: linear-gradient(180deg, rgba(138,43,226,0.1) 0%, rgba(255,182,193,0.05) 100%);
+      border-radius: 8px;
+    }
+
+    .sleeping-scene {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .sleeping-person {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70px;
+      height: 60px;
+    }
+
+    .sleeping-figure {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      animation: sleepingBreath 4s ease-in-out infinite;
+    }
+
+    .sleeping-head {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%) rotate(15deg);
+      width: 25px;
+      height: 25px;
+      background: linear-gradient(135deg, #fdbcb4, #ffb6c1);
+      border-radius: 50% 50% 45% 45%;
+      animation: headLoll 3s ease-in-out infinite;
+    }
+
+    .sleeping-face {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 18px;
+    }
+
+    .sleeping-eyes {
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 16px;
+      height: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .sleeping-eye {
+      position: relative;
+      width: 5px;
+      height: 3px;
+      background: transparent;
+      border-radius: 50%;
+      border: 1px solid #333;
+    }
+
+    .sleeping-eye.closed {
+      height: 1px;
+      background: #333;
+    }
+
+    .eyelid {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #fdbcb4;
+      border-radius: 50%;
+      animation: eyeTwitch 6s ease-in-out infinite;
+    }
+
+    .sleeping-nose {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 2px;
+      background: rgba(139,69,19,0.3);
+      border-radius: 50%;
+    }
+
+    .sleeping-mouth {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 4px;
+      border-radius: 0 0 4px 4px;
+    }
+
+    .sleeping-mouth.open {
+      background: #333;
+      height: 6px;
+      animation: mouthDrop 4s ease-in-out infinite;
+    }
+
+    .droplet {
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 3px;
+      background: rgba(100,149,237,0.6);
+      border-radius: 50% 50% 50% 50%;
+      animation: droolFall 3s ease-in-out infinite;
+    }
+
+    .messy-hair {
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 8px;
+    }
+
+    .hair-strand {
+      position: absolute;
+      width: 3px;
+      height: 5px;
+      background: #4a4a4a;
+      border-radius: 50% 50% 50% 50%;
+    }
+
+    .strand1 { left: 2px; transform: rotate(-15deg); animation: hairMessy 2s ease-in-out infinite; }
+    .strand2 { left: 6px; transform: rotate(5deg); animation: hairMessy 2s ease-in-out infinite 0.5s; }
+    .strand3 { left: 10px; transform: rotate(-5deg); animation: hairMessy 2s ease-in-out infinite 1s; }
+    .strand4 { left: 14px; transform: rotate(10deg); animation: hairMessy 2s ease-in-out infinite 1.5s; }
+
+    .sleeping-torso {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) rotate(10deg);
+      width: 30px;
+      height: 25px;
+      background: linear-gradient(180deg, #87ceeb, #4682b4);
+      border-radius: 8px 8px 6px 6px;
+      animation: torsoRise 4s ease-in-out infinite;
+    }
+
+    .sleeping-chest {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 18px;
+      background: linear-gradient(180deg, #add8e6, #87ceeb);
+      border-radius: 4px;
+    }
+
+    .clothes-shirt {
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 14px;
+      background: linear-gradient(180deg, #ffffff, #f0f0f0);
+      border-radius: 2px;
+    }
+
+    .sleeping-arms {
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 45px;
+      height: 8px;
+    }
+
+    .sleeping-arm {
+      position: absolute;
+      width: 3px;
+      height: 18px;
+      background: linear-gradient(180deg, #fdbcb4, #ffb6c1);
+      border-radius: 2px;
+    }
+
+    .sleeping-arm.left {
+      left: 0;
+      transform: rotate(25deg);
+      animation: armLimpLeft 4s ease-in-out infinite;
+    }
+
+    .sleeping-arm.right {
+      right: 0;
+      transform: rotate(-35deg);
+      animation: armLimpRight 4s ease-in-out infinite 0.5s;
+    }
+
+    .sleeping-legs {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 25px;
+      height: 15px;
+    }
+
+    .sleeping-leg {
+      position: absolute;
+      width: 4px;
+      height: 15px;
+      background: linear-gradient(180deg, #4169e1, #1e3a8a);
+      border-radius: 2px;
+    }
+
+    .sleeping-leg.left {
+      left: 5px;
+      transform: rotate(5deg);
+      animation: legStretchLeft 4s ease-in-out infinite;
+    }
+
+    .sleeping-leg.right {
+      right: 5px;
+      transform: rotate(-8deg);
+      animation: legStretchRight 4s ease-in-out infinite 0.3s;
+    }
+
+    .sleeping-position {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 15px;
+    }
+
+    .pillow {
+      position: absolute;
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 50px;
+      height: 12px;
+      background: linear-gradient(180deg, #f0f0f0, #d0d0d0);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .pillow-shadow {
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 45px;
+      height: 4px;
+      background: rgba(0,0,0,0.1);
+      border-radius: 50%;
+    }
+
+    .sleeping-surface {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 70px;
+      height: 3px;
+      background: rgba(100,100,100,0.2);
+      border-radius: 50%;
+    }
+
+    .sleep-effects {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      width: 50px;
+      height: 40px;
+    }
+
+    .zzz-clouds {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 20px;
+    }
+
+    .zzz {
+      position: absolute;
+      font-size: 10px;
+      font-weight: bold;
+      color: #4169e1;
+      animation: zzzFloat 3s ease-in-out infinite;
+    }
+
+    .zzz1 { left: 5px; animation-delay: 0s; }
+    .zzz2 { left: 15px; animation-delay: 1s; }
+    .zzz3 { left: 25px; animation-delay: 2s; }
+
+    .sleep-bubbles {
+      position: absolute;
+      top: 20px;
+      left: 0;
+      width: 100%;
+      height: 20px;
+    }
+
+    .sleep-bubble {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: rgba(255,255,255,0.4);
+      border-radius: 50%;
+      animation: bubbleRise 4s ease-in-out infinite;
+    }
+
+    .bubble1 { left: 8px; animation-delay: 0s; }
+    .bubble2 { left: 20px; animation-delay: 1.3s; }
+    .bubble3 { left: 32px; animation-delay: 2.6s; }
+
+    .drool-drops {
+      position: absolute;
+      top: 30px;
+      left: 0;
+      width: 100%;
+      height: 15px;
+    }
+
+    .drool-drop {
+      position: absolute;
+      font-size: 8px;
+      animation: droolDrip 5s ease-in-out infinite;
+    }
+
+    .drop1 { left: 10px; animation-delay: 0s; }
+    .drop2 { left: 25px; animation-delay: 2.5s; }
+
+    .sleeping-text {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      width: 100px;
+      height: 30px;
+    }
+
+    .dream-bubble {
+      background: linear-gradient(135deg, #fff, #f0f0f0);
+      border-radius: 15px;
+      padding: 5px 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      animation: dreamWobble 4s ease-in-out infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .sleep-emoji {
+      font-size: 10px;
+      animation: emojiSleep 2s ease-in-out infinite;
+    }
+
+    .dream-text {
+      font-size: 10px;
+      margin: 0 3px;
+    }
+
+    .comedy-elements {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 40px;
+      height: 30px;
+    }
+
+    .twitching {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 15px;
+    }
+
+    .twitch-effect {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(255,0,0,0.3);
+      border-radius: 50%;
+      animation: twitch 0.2s ease-in-out infinite;
+    }
+
+    .effect1 { left: 10px; animation-delay: 0s; }
+    .effect2 { left: 20px; animation-delay: 0.1s; }
+
+    .snore-sound {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 15px;
+    }
+
+    .sound-wave {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(100,100,100,0.4);
+      border-radius: 50%;
+      animation: soundWave 2s ease-in-out infinite;
+    }
+
+    .wave1 { left: 5px; animation-delay: 0s; }
+    .wave2 { left: 15px; animation-delay: 0.7s; }
+    .wave3 { left: 25px; animation-delay: 1.4s; }
+
+    .character-torso {
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 25px;
+      background: linear-gradient(180deg, #87ceeb, #4682b4);
+      border-radius: 8px 8px 4px 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .tie {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 15px;
+      background: linear-gradient(180deg, #ff0000, #8b0000);
+      border-radius: 0 0 2px 2px;
+    }
+
+    .character-arms {
+      position: absolute;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 20px;
+    }
+
+    .arm {
+      position: absolute;
+      width: 3px;
+      height: 15px;
+      background: linear-gradient(180deg, #fdbcb4, #ffb6c1);
+      border-radius: 2px;
+    }
+
+    .arm.left {
+      left: 0;
+      transform-origin: top center;
+      animation: waveArm 1s ease-in-out infinite;
+    }
+
+    .arm.right {
+      right: 0;
+      transform-origin: top center;
+      animation: danceArm 1.5s ease-in-out infinite;
+    }
+
+    .character-legs {
+      position: absolute;
+      top: 45px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      height: 20px;
+    }
+
+    .leg {
+      position: absolute;
+      width: 3px;
+      height: 18px;
+      background: linear-gradient(180deg, #4682b4, #1e3a8a);
+      border-radius: 2px;
+    }
+
+    .leg.left {
+      left: 5px;
+      transform-origin: top center;
+      animation: tapLeg 0.8s ease-in-out infinite;
+    }
+
+    .leg.right {
+      right: 5px;
+      transform-origin: top center;
+      animation: tapLeg 0.8s ease-in-out infinite 0.4s;
+    }
+
+    .funny-elements {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      width: 80px;
+      height: 80px;
+    }
+
+    .music-notes {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 30px;
+    }
+
+    .note {
+      position: absolute;
+      font-size: 12px;
+      color: #ff69b4;
+      animation: floatNote 3s ease-in-out infinite;
+    }
+
+    .note:nth-child(1) {
+      left: 10px;
+      animation-delay: 0s;
+    }
+
+    .note:nth-child(2) {
+      left: 35px;
+      animation-delay: 1s;
+    }
+
+    .note:nth-child(3) {
+      left: 60px;
+      animation-delay: 2s;
+    }
+
+    .sparkles {
+      position: absolute;
+      top: 35px;
+      left: 0;
+      width: 100%;
+      height: 20px;
+    }
+
+    .sparkle {
+      position: absolute;
+      font-size: 10px;
+      animation: sparkleFloat 2s ease-in-out infinite;
+    }
+
+    .sparkle:nth-child(1) {
+      left: 15px;
+      animation-delay: 0s;
+    }
+
+    .sparkle:nth-child(2) {
+      left: 40px;
+      animation-delay: 0.7s;
+    }
+
+    .sparkle:nth-child(3) {
+      left: 65px;
+      animation-delay: 1.4s;
+    }
+
+    .coffee-mug {
+      position: absolute;
+      bottom: 5px;
+      right: 10px;
+      width: 20px;
+      height: 25px;
+    }
+
+    .mug-body {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 15px;
+      height: 20px;
+      background: linear-gradient(180deg, #8b4513, #654321);
+      border-radius: 0 0 3px 3px;
+    }
+
+    .coffee {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      right: 2px;
+      height: 6px;
+      background: linear-gradient(180deg, #4a2c2a, #3e2723);
+      border-radius: 1px;
+      animation: coffeeBubble 4s ease-in-out infinite;
+    }
+
+    .mug-handle {
+      position: absolute;
+      top: 5px;
+      right: -3px;
+      width: 5px;
+      height: 10px;
+      border: 2px solid #654321;
+      border-left: none;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .steam {
+      position: absolute;
+      top: -5px;
+      left: 3px;
+      width: 10px;
+      height: 8px;
+    }
+
+    .steam-particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: steamRise 2s ease-in-out infinite;
+    }
+
+    .steam-particle:nth-child(1) {
+      left: 2px;
+      animation-delay: 0s;
+    }
+
+    .steam-particle:nth-child(2) {
+      left: 5px;
+      animation-delay: 0.7s;
+    }
+
+    .steam-particle:nth-child(3) {
+      left: 8px;
+      animation-delay: 1.4s;
+    }
+
+    .funny-text {
+      position: absolute;
+      top: 15px;
+      left: 100px;
+      width: 120px;
+      height: 40px;
+    }
+
+    .text-bubble {
+      position: relative;
+      background: linear-gradient(135deg, #fff, #f0f0f0);
+      border-radius: 20px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      animation: bubbleWobble 3s ease-in-out infinite;
+    }
+
+    .emoji {
+      font-size: 16px;
+      margin-right: 5px;
+      animation: emojiSpin 2s ease-in-out infinite;
+    }
+
+    .message {
+      font-size: 11px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .progress-fun {
+      position: absolute;
+      bottom: 10px;
+      right: 20px;
+      width: 150px;
+      height: 30px;
+    }
+
+    .funny-progress {
+      position: relative;
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.3);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 5px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff69b4, #ffb6c1, #ff69b4);
+      border-radius: 4px;
+      animation: progressDance 3s ease-in-out infinite;
+    }
+
+    .progress-character {
+      position: absolute;
+      top: -8px;
+      right: 20px;
+      font-size: 12px;
+      animation: characterDance 1s ease-in-out infinite;
+    }
+
+    .time-balloons {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 20px;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .balloon {
+      position: relative;
+      width: 15px;
+      height: 20px;
+    }
+
+    .balloon-body {
+      font-size: 14px;
+      animation: balloonFloat 4s ease-in-out infinite;
+    }
+
+    .balloon-string {
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1px;
+      height: 5px;
+      background: #666;
+    }
+
+    .balloon:nth-child(2) .balloon-body {
+      animation-delay: 2s;
+    }
+
+    /* Funny Animation Keyframes */
+    @keyframes characterBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    @keyframes eyeWink {
+      0%, 90%, 100% { height: 4px; }
+      95% { height: 1px; }
+    }
+
+    @keyframes smileWiggle {
+      0%, 100% { width: 8px; }
+      50% { width: 10px; }
+    }
+
+    @keyframes waveArm {
+      0%, 100% { transform: rotate(-20deg); }
+      50% { transform: rotate(-60deg); }
+    }
+
+    @keyframes danceArm {
+      0%, 100% { transform: rotate(20deg); }
+      50% { transform: rotate(60deg); }
+    }
+
+    @keyframes tapLeg {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-10deg); }
+    }
+
+    @keyframes floatNote {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0; }
+      20%, 80% { opacity: 1; }
+      100% { transform: translateY(-20px) rotate(360deg); opacity: 0; }
+    }
+
+    @keyframes sparkleFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+      20%, 80% { opacity: 1; }
+      100% { transform: translateY(-15px) scale(0.5); opacity: 0; }
+    }
+
+    @keyframes coffeeBubble {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-1px); }
+    }
+
+    @keyframes steamRise {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+      20%, 80% { opacity: 0.6; }
+      100% { transform: translateY(-8px) scale(0.5); opacity: 0; }
+    }
+
+    @keyframes bubbleWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(1deg); }
+      75% { transform: scale(0.95) rotate(-1deg); }
+    }
+
+    @keyframes emojiSpin {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(10deg); }
+    }
+
+    @keyframes progressDance {
+      0%, 100% { width: 30%; }
+      50% { width: 80%; }
+    }
+
+    @keyframes characterDance {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-2px) rotate(-5deg); }
+      75% { transform: translateY(-2px) rotate(5deg); }
+    }
+
+    @keyframes balloonFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* Sleeping Animation Keyframes */
+    @keyframes sleepingBreath {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-2px) scale(1.02); }
+    }
+
+    @keyframes headLoll {
+      0%, 100% { transform: translateX(-50%) rotate(15deg); }
+      50% { transform: translateX(-50%) rotate(25deg); }
+    }
+
+    @keyframes eyeTwitch {
+      0%, 85%, 95%, 100% { transform: scale(1); }
+      90% { transform: scale(0.8); }
+    }
+
+    @keyframes mouthDrop {
+      0%, 70%, 100% { height: 6px; }
+      85% { height: 8px; }
+    }
+
+    @keyframes droolFall {
+      0%, 70%, 100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 0; }
+      75%, 85% { opacity: 1; }
+      90% { transform: translateX(-50%) translateY(5px) scale(1.2); opacity: 0.8; }
+      95% { transform: translateX(-50%) translateY(8px) scale(0.8); opacity: 0; }
+    }
+
+    @keyframes hairMessy {
+      0%, 100% { transform: rotate(var(--rotation, 0deg)); }
+      50% { transform: rotate(calc(var(--rotation, 0deg) + 5deg)); }
+    }
+
+    .strand1 { --rotation: -15deg; }
+    .strand2 { --rotation: 5deg; }
+    .strand3 { --rotation: -5deg; }
+    .strand4 { --rotation: 10deg; }
+
+    @keyframes torsoRise {
+      0%, 100% { transform: translateX(-50%) rotate(10deg) translateY(0); }
+      50% { transform: translateX(-50%) rotate(12deg) translateY(-1px); }
+    }
+
+    @keyframes armLimpLeft {
+      0%, 100% { transform: rotate(25deg); }
+      50% { transform: rotate(30deg); }
+    }
+
+    @keyframes armLimpRight {
+      0%, 100% { transform: rotate(-35deg); }
+      50% { transform: rotate(-40deg); }
+    }
+
+    @keyframes legStretchLeft {
+      0%, 100% { transform: rotate(5deg); }
+      50% { transform: rotate(8deg); }
+    }
+
+    @keyframes legStretchRight {
+      0%, 100% { transform: rotate(-8deg); }
+      50% { transform: rotate(-12deg); }
+    }
+
+    @keyframes zzzFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0; }
+      20%, 80% { opacity: 1; }
+      100% { transform: translateY(-20px) rotate(15deg); opacity: 0; }
+    }
+
+    @keyframes bubbleRise {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+      20%, 80% { opacity: 0.6; }
+      100% { transform: translateY(-15px) scale(1.5); opacity: 0; }
+    }
+
+    @keyframes droolDrip {
+      0%, 70%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+      75%, 85% { opacity: 1; }
+      90% { transform: translateY(10px) scale(1.2); opacity: 0.8; }
+      95% { transform: translateY(15px) scale(0.8); opacity: 0; }
+    }
+
+    @keyframes dreamWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(1deg); }
+      75% { transform: scale(0.95) rotate(-1deg); }
+    }
+
+    @keyframes emojiSleep {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    @keyframes twitch {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes soundWave {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.5); opacity: 0.6; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    /* Office Entry Animation Keyframes */
+    @keyframes doorBreak {
+      0%, 40% { transform: scale(1) rotate(0deg); }
+      43% { transform: scale(1.05) rotate(1deg); }
+      45% { transform: scale(0.95) rotate(-1deg); }
+      47% { transform: scale(1.02) rotate(0.5deg); }
+      50% { transform: scale(0.98) rotate(-0.5deg); }
+      52%, 100% { transform: scale(1) rotate(0deg); }
+    }
+
+    @keyframes crackAppear {
+      0%, 42% { opacity: 0; }
+      43% { opacity: 0.3; }
+      45% { opacity: 0.6; }
+      47% { opacity: 0.8; }
+      50%, 100% { opacity: 0.4; }
+    }
+
+    @keyframes pieceFly {
+      0%, 43% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0; }
+      45% { transform: translate(var(--x, 10px), var(--y, -20px)) scale(0.8) rotate(180deg); opacity: 1; }
+      55% { transform: translate(calc(var(--x, 10px) * 2), calc(var(--y, -20px) * 2)) scale(0.6) rotate(360deg); opacity: 0.8; }
+      65%, 100% { transform: translate(calc(var(--x, 10px) * 3), calc(var(--y, -20px) * 3)) scale(0.4) rotate(540deg); opacity: 0; }
+    }
+
+    .piece1 { --x: -15px; --y: -25px; }
+    .piece2 { --x: 20px; --y: -30px; }
+    .piece3 { --x: -10px; --y: -35px; }
+    .piece4 { --x: 25px; --y: -20px; }
+
+    @keyframes humanEntry {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(100px); }
+      40% { transform: translateX(200px); }
+      43% { transform: translateX(210px) scale(1.1); }
+      45% { transform: translateX(215px) scale(0.95); }
+      50% { transform: translateX(220px) scale(1); }
+      55% { transform: translateX(240px); }
+      70% { transform: translateX(300px); }
+      85% { transform: translateX(320px); }
+      90%, 100% { transform: translateX(320px); }
+    }
+
+    @keyframes headBob {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-1px); }
+    }
+
+    @keyframes pupilLook {
+      0%, 100% { transform: translate(-50%, -50%); }
+      50% { transform: translate(-40%, -50%); }
+    }
+
+    @keyframes hairSway {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(3deg); }
+    }
+
+    @keyframes torsoSway {
+      0%, 100% { transform: translateX(-50%) rotate(0deg); }
+      50% { transform: translateX(-50%) rotate(2deg); }
+    }
+
+    @keyframes armCharge {
+      0%, 100% { transform: rotate(-10deg); }
+      50% { transform: rotate(-30deg); }
+    }
+
+    @keyframes legRun {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-25deg); }
+    }
+
+    @keyframes dustKick {
+      0%, 18%, 100% { opacity: 0; transform: translateY(0) scale(1); }
+      20% { opacity: 1; transform: translateY(-2px) scale(1.2); }
+      30% { opacity: 0.8; transform: translateY(-8px) scale(0.8); }
+      40% { opacity: 0; transform: translateY(-15px) scale(0.5); }
+    }
+
+    @keyframes chairRoll {
+      0%, 60% { transform: translateX(0); }
+      65% { transform: translateX(5px); }
+      70% { transform: translateX(10px); }
+      75%, 100% { transform: translateX(10px); }
+    }
+
+    @keyframes wheelSpin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes laptopPowerOn {
+      0%, 70% { opacity: 0.3; }
+      75% { opacity: 0.6; }
+      80%, 100% { opacity: 1; }
+    }
+
+    @keyframes screenTurnOn {
+      0%, 70% { opacity: 1; }
+      75% { opacity: 0.5; }
+      80%, 100% { opacity: 0; }
+    }
+
+    @keyframes bootScreen {
+      0%, 75% { opacity: 0; }
+      80% { opacity: 0.3; }
+      85% { opacity: 0.8; }
+      90%, 100% { opacity: 1; }
+    }
+
+    @keyframes powerLedBlink {
+      0%, 70% { background: #ff0000; opacity: 0.3; }
+      75% { background: #ffff00; opacity: 0.6; }
+      80%, 100% { background: #00ff00; opacity: 1; }
+    }
+
+    @keyframes sparkFly {
+      0%, 80% { opacity: 0; transform: translate(0, 0) scale(0); }
+      85% { opacity: 1; transform: translate(var(--sx, 0px), var(--sy, 0px)) scale(1); }
+      90% { opacity: 0.8; transform: translate(calc(var(--sx, 0px) * 2), calc(var(--sy, 0px) * 2)) scale(0.8); }
+      95%, 100% { opacity: 0; transform: translate(calc(var(--sx, 0px) * 3), calc(var(--sy, 0px) * 3)) scale(0.5); }
+    }
+
+    .spark1 { --sx: -5px; --sy: -10px; }
+    .spark2 { --sx: 8px; --sy: -8px; }
+    .spark3 { --sx: -3px; --sy: -12px; }
+
+    @keyframes impactShow {
+      0%, 42% { opacity: 0; }
+      43% { opacity: 1; }
+      55% { opacity: 0.8; }
+      65%, 100% { opacity: 0; }
+    }
+
+    @keyframes starBurst {
+      0% { transform: scale(0) rotate(0deg); opacity: 1; }
+      50% { transform: scale(1.5) rotate(180deg); opacity: 0.8; }
+      100% { transform: scale(2) rotate(360deg); opacity: 0; }
+    }
+
+    @keyframes soundExpand {
+      0% { transform: scale(0.5); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    @keyframes textShow {
+      0%, 70% { opacity: 0; transform: scale(0.8); }
+      75% { opacity: 1; transform: scale(1); }
+      85%, 100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes bubbleWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(1deg); }
+      75% { transform: scale(0.95) rotate(-1deg); }
+    }
+
+    @keyframes emojiPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    /* Sitting Animation Keyframes */
+    @keyframes screenWakeUp {
+      0%, 75% { opacity: 1; }
+      80% { opacity: 0.5; }
+      85%, 100% { opacity: 0; }
+    }
+
+    @keyframes screenWork {
+      0%, 75% { opacity: 0; }
+      80% { opacity: 0.3; }
+      85%, 100% { opacity: 1; }
+    }
+
+    @keyframes typingShow {
+      0%, 75% { opacity: 0; }
+      80%, 100% { opacity: 1; }
+    }
+
+    @keyframes dotBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes steamRiseMain {
+      0% { transform: translateY(0) scale(1); opacity: 0.6; }
+      100% { transform: translateY(-5px) scale(0.5); opacity: 0; }
+    }
+
+    @keyframes headNodSitting {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-1px); }
+    }
+
+    @keyframes eyeFocusSitting {
+      0%, 100% { transform: translate(-50%, -50%); }
+      50% { transform: translate(-45%, -50%); }
+    }
+
+    @keyframes hairSwaySitting {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(2deg); }
+    }
+
+    @keyframes torsoSwaySitting {
+      0%, 100% { transform: translateX(-50%) rotate(0deg); }
+      50% { transform: translateX(-50%) rotate(1deg); }
+    }
+
+    @keyframes armTyping {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-5deg); }
+    }
+
+    @keyframes wheelSpinMain {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes typingIndicatorShow {
+      0%, 75% { opacity: 0; }
+      80%, 100% { opacity: 1; }
+    }
+
+    @keyframes cursorBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    @keyframes sparkFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+      20%, 80% { opacity: 1; }
+      100% { transform: translateY(-10px) scale(0.8); opacity: 0; }
+    }
+
+    @keyframes startTextShow {
+      0%, 70% { opacity: 0; transform: scale(0.8); }
+      75%, 100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes startBubbleWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.02) rotate(1deg); }
+      75% { transform: scale(0.98) rotate(-1deg); }
+    }
+
+    @keyframes startEmojiPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    /* Falling Animation Keyframes */
+    @keyframes humanFallPath {
+      0% { top: 10px; transform: translateX(-50%) rotate(0deg); }
+      25% { top: 30px; transform: translateX(-50%) rotate(90deg); }
+      50% { top: 50px; transform: translateX(-50%) rotate(180deg); }
+      75% { top: 70px; transform: translateX(-50%) rotate(270deg); }
+      85% { top: 85px; transform: translateX(-50%) rotate(360deg); }
+      90%, 100% { top: 90px; transform: translateX(-50%) rotate(360deg); }
+    }
+
+    @keyframes humanSpin {
+      0%, 70% { transform: rotate(0deg); }
+      75% { transform: rotate(90deg); }
+      80% { transform: rotate(180deg); }
+      85% { transform: rotate(270deg); }
+      90%, 100% { transform: rotate(360deg); }
+    }
+
+    @keyframes headTumble {
+      0%, 70% { transform: translateX(-50%) rotate(0deg); }
+      75% { transform: translateX(-50%) rotate(45deg); }
+      80% { transform: translateX(-50%) rotate(90deg); }
+      85% { transform: translateX(-50%) rotate(135deg); }
+      90%, 100% { transform: translateX(-50%) rotate(180deg); }
+    }
+
+    @keyframes eyeSqueeze {
+      0%, 70% { transform: scale(1); }
+      75% { transform: scale(0.5); }
+      80%, 100% { transform: scale(0.2); }
+    }
+
+    @keyframes mouthGasp {
+      0%, 70% { width: 4px; height: 3px; border-radius: 50%; }
+      75% { width: 5px; height: 4px; border-radius: 50%; }
+      80%, 100% { width: 6px; height: 5px; border-radius: 50%; }
+    }
+
+    @keyframes hairFly {
+      0%, 70% { transform: rotate(0deg) translateY(0); }
+      75% { transform: rotate(15deg) translateY(-2px); }
+      80% { transform: rotate(30deg) translateY(-4px); }
+      85%, 100% { transform: rotate(45deg) translateY(-6px); }
+    }
+
+    @keyframes torsoFlip {
+      0%, 70% { transform: translateX(-50%) rotate(0deg); }
+      75% { transform: translateX(-50%) rotate(45deg); }
+      80% { transform: translateX(-50%) rotate(90deg); }
+      85% { transform: translateX(-50%) rotate(135deg); }
+      90%, 100% { transform: translateX(-50%) rotate(180deg); }
+    }
+
+    @keyframes armFlail {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-45deg); }
+      75% { transform: rotate(45deg); }
+    }
+
+    @keyframes legKick {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-30deg); }
+      75% { transform: rotate(30deg); }
+    }
+
+    @keyframes shadowGrow {
+      0%, 70% { width: 30px; height: 8px; opacity: 0.2; }
+      85% { width: 40px; height: 10px; opacity: 0.4; }
+      90%, 100% { width: 50px; height: 12px; opacity: 0.6; }
+    }
+
+    @keyframes craterForm {
+      0%, 85% { opacity: 0; transform: translateX(-50%) scale(0.5); }
+      90% { opacity: 0.5; transform: translateX(-50%) scale(0.8); }
+      95%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+    }
+
+    @keyframes debrisFly {
+      0%, 85% { opacity: 0; transform: translate(0, 0) scale(1); }
+      90% { opacity: 1; transform: translate(var(--dx, 10px), var(--dy, -15px)) scale(0.8); }
+      95% { opacity: 0.8; transform: translate(calc(var(--dx, 10px) * 2), calc(var(--dy, -15px) * 2)) scale(0.6); }
+      100% { opacity: 0; transform: translate(calc(var(--dx, 10px) * 3), calc(var(--dy, -15px) * 3)) scale(0.4); }
+    }
+
+    .particle1 { --dx: -8px; --dy: -20px; }
+    .particle2 { --dx: 12px; --dy: -18px; }
+    .particle3 { --dx: -5px; --dy: -22px; }
+    .particle4 { --dx: 15px; --dy: -16px; }
+    .particle5 { --dx: -10px; --dy: -19px; }
+
+    @keyframes motionBlur {
+      0%, 20%, 80%, 100% { opacity: 0; transform: translateX(0); }
+      30%, 70% { opacity: 0.8; transform: translateX(var(--mx, 5px)); }
+    }
+
+    .line1 { --mx: -3px; }
+    .line2 { --mx: 3px; }
+    .line3 { --mx: -5px; }
+    .line4 { --mx: 5px; }
+    .line5 { --mx: -2px; }
+
+    @keyframes starBurstFall {
+      0%, 85% { opacity: 0; transform: scale(0) rotate(0deg); }
+      90% { opacity: 1; transform: scale(1) rotate(180deg); }
+      95%, 100% { opacity: 0; transform: scale(1.5) rotate(360deg); }
+    }
+
+    @keyframes dustPuff {
+      0%, 85% { opacity: 0; transform: scale(0.5); }
+      90% { opacity: 0.8; transform: scale(1); }
+      95% { opacity: 0.6; transform: scale(1.5); }
+      100% { opacity: 0; transform: scale(2); }
+    }
+
+    @keyframes statusTextShow {
+      0%, 70% { opacity: 0; transform: scale(0.8); }
+      75%, 100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes statusBubbleWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(2deg); }
+      75% { transform: scale(0.95) rotate(-2deg); }
+    }
+
+    @keyframes statusEmojiPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    /* Mosquito Chase Animation Keyframes */
+    @keyframes humanChasePath {
+      0% { left: -50px; bottom: 15px; }
+      20% { left: 20%; bottom: 20px; }
+      40% { left: 40%; bottom: 18px; }
+      60% { left: 60%; bottom: 22px; }
+      80% { left: 75%; bottom: 15px; }
+      85% { left: 80%; bottom: 25px; transform: rotate(-15deg); }
+      90% { left: 82%; bottom: 20px; transform: rotate(0deg); }
+      95% { left: 78%; bottom: 18px; transform: rotate(10deg); }
+      100% { left: -50px; bottom: 15px; transform: rotate(0deg); }
+    }
+
+    @keyframes humanChaseBody {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+      75% { transform: rotate(-3deg); }
+    }
+
+    @keyframes headChaseBob {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-2px); }
+    }
+
+    @keyframes eyeChaseFocus {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    @keyframes mouthFrustrated {
+      0%, 100% { width: 4px; height: 2px; }
+      50% { width: 5px; height: 3px; }
+    }
+
+    @keyframes hairChaseMessy {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-5deg); }
+      75% { transform: rotate(5deg); }
+    }
+
+    @keyframes torsoChaseLean {
+      0%, 100% { transform: translateX(-50%) rotate(0deg); }
+      25% { transform: translateX(-50%) rotate(-3deg); }
+      75% { transform: translateX(-50%) rotate(3deg); }
+    }
+
+    @keyframes armSwingBat {
+      0% { transform: rotate(-45deg); }
+      50% { transform: rotate(45deg); }
+      100% { transform: rotate(-45deg); }
+    }
+
+    @keyframes armReach {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(30deg); }
+    }
+
+    @keyframes legChaseRun {
+      0% { transform: rotate(-20deg); }
+      50% { transform: rotate(20deg); }
+      100% { transform: rotate(-20deg); }
+    }
+
+    @keyframes chaseShadowFollow {
+      0% { left: -50px; opacity: 0.3; }
+      20% { left: 20%; opacity: 0.4; }
+      40% { left: 40%; opacity: 0.3; }
+      60% { left: 60%; opacity: 0.5; }
+      80% { left: 75%; opacity: 0.4; }
+      85% { left: 80%; opacity: 0.6; }
+      90% { left: 82%; opacity: 0.5; }
+      95% { left: 78%; opacity: 0.4; }
+      100% { left: -50px; opacity: 0.3; }
+    }
+
+    @keyframes mosquitoFly {
+      0% { top: 20px; right: 30px; }
+      15% { top: 15px; right: 50%; }
+      30% { top: 25px; right: 70%; }
+      45% { top: 10px; right: 40%; }
+      60% { top: 30px; right: 60%; }
+      75% { top: 5px; right: 80%; }
+      85% { top: 35px; right: 20%; }
+      100% { top: 20px; right: 30px; }
+    }
+
+    @keyframes wingFlapLeft {
+      0%, 100% { transform: rotateY(0deg); }
+      50% { transform: rotateY(45deg); }
+    }
+
+    @keyframes wingFlapRight {
+      0%, 100% { transform: rotateY(0deg); }
+      50% { transform: rotateY(-45deg); }
+    }
+
+    @keyframes batSwing {
+      0%, 70% { transform: rotate(0deg); }
+      75% { transform: rotate(-90deg); }
+      80% { transform: rotate(0deg); }
+      85% { transform: rotate(-45deg); }
+      90% { transform: rotate(0deg); }
+      95% { transform: rotate(-30deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    @keyframes chaseMotionBlur {
+      0%, 20%, 80%, 100% { opacity: 0; transform: translateX(0); }
+      30%, 70% { opacity: 0.8; transform: translateX(var(--cx, 10px)); }
+    }
+
+    .line1 { --cx: -5px; }
+    .line2 { --cx: 5px; }
+    .line3 { --cx: -8px; }
+    .line4 { --cx: 8px; }
+
+    @keyframes buzzSound {
+      0% { transform: scale(0.5); opacity: 0.8; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+
+    @keyframes missSwirl {
+      0%, 85% { opacity: 0; transform: rotate(0deg) scale(0.5); }
+      90% { opacity: 1; transform: rotate(180deg) scale(1); }
+      95% { opacity: 0.8; transform: rotate(360deg) scale(1.2); }
+      100% { opacity: 0; transform: rotate(540deg) scale(1.5); }
+    }
+
+    @keyframes chaseStatusShow {
+      0%, 50% { opacity: 0; transform: scale(0.8); }
+      55%, 95% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.8); }
+    }
+
+    @keyframes chaseBubbleWobble {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(2deg); }
+      75% { transform: scale(0.95) rotate(-2deg); }
+    }
+
+    @keyframes chaseEmojiPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+    }
+
+    .card::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent);animation:shimmer 3s infinite}.stat::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);animation:shimmer 4s infinite}.btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);animation:shimmer 2s infinite}@keyframes shimmer{0%{left:-100%}100%{left:100%}}
+  </style>
+</head>
+<body>
+
+    <div class="container">
+    <div class="user-row">
+      <div>
+        <h1 id="userName">NDS punch tracker</h1>
+        <p id="userEmail" class="muted">loading...</p>
+      </div>
+    </div>
+
+    <!-- Last Punch / Today Total removed (read-only tracker shows session breakdown below) -->
+
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Started At</div>
+        <div id="startedAt">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">Worked So Far</div>
+        <div id="workedSoFar">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">Remaining</div>
+        <div id="remaining">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">Expected Leave</div>
+        <div id="expectedLeave">—</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat" style="flex:0 0 130px">
+        <div class="label">Breaks Today</div>
+        <div id="breaksTotal">—</div>
+      </div>
+      <div class="stat" style="flex:0 0 170px">
+        <div class="label">Breaks allowed (remaining)</div>
+        <div id="breaksRemaining">—</div>
+      </div>
+      <div class="stat" style="flex:1 1 auto;min-width:220px">
+        <div class="label">Controls</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+          <button id="refreshBtn" class="btn outline">Refresh</button>
+          <button id="setHoursBtn" class="btn outline">Set target hours</button>
+          <button id="setBreakBtn" class="btn outline">Set allowed break</button>
+          <button id="setEmpBtn" class="btn outline">Set Employee ID</button>
+          <button id="setKeyBtn" class="btn outline">Set API Key</button>
+        </div>
+      </div>
+    </div>
+
+
+      <div class="log">
+      <h3>Recent punches</h3>
+      <ul id="punchList"></ul>
+    </div>
+
+      <!-- Nearby breaks removed per user request -->
+
+    </div>
+
+  <div class="footer">
+    <div class="small">Date: <span id="modeLabel">—</span></div>
+    <div class="small">Last sync: <span id="lastSync">—</span></div>
+    <div class="small">Target: <span id="targetLabel">—</span></div>
+  </div>
+
+  <script>
+    (function(){
+      // helpers
+      const $ = id => document.getElementById(id);
+      const userNameEl = $('userName');
+      const userEmailEl = $('userEmail');
+      // status/last/today removed
+      const punchListEl = $('punchList');
+      // Punch buttons removed — read-only mode (data from API only)
+      const modeLabel = $('modeLabel');
+      const lastSync = $('lastSync');
+      const refreshBtn = $('refreshBtn');
+      const setHoursBtn = $('setHoursBtn');
+      const setBreakBtn = document.getElementById('setBreakBtn');
+      const setEmpBtn = document.getElementById('setEmpBtn');
+      const setKeyBtn = document.getElementById('setKeyBtn');
+      const targetLabel = $('targetLabel');
+      const breaksRemainingEl = $('breaksRemaining');
+      
+      // initialize custom allowed break (null means auto-compute based on first IN time)
+      let allowedBreakMinutesCustom = null;
+      
+
+      function formatDateTime(iso){ try{ return new Date(iso).toLocaleString() }catch(e){ return iso } }
+      function formatTime(iso){ try{ return new Date(iso).toLocaleTimeString() }catch(e){ return iso } }
+      function durationToString(ms){ if(!ms||ms<=0) return '0h 0m'; const mins=Math.floor(ms/60000),h=Math.floor(mins/60),m=mins%60; return `${h}h ${m}m`; }
+
+      // CONFIG: edit these values directly in the file
+      const CONFIG = {
+        // set the full URL you want to call (absolute URL including query params)
+        FULL_ENDPOINT: 'http://192.168.168.183:950/api/Mssql_ComboShift/getcombosearchdetails/?fromdate=2025-11-18&todate=2025-11-18&empid=ndxxx',
+        // API key/token: keep empty in the file. Use the "Set API Key" button at runtime.
+        API_KEY: '',
+        AUTH_TYPE: 'Bearer', // 'Bearer' or 'Header' or 'None'
+        HEADER_NAME: 'X-API-KEY',
+        WORK_HOURS: 8.25
+      };
+
+      // NOTE: do NOT prefill an API key for new sessions — keep empty by default
+      const defaultCfg = { API_URL:'', API_KEY:'', authType:CONFIG.AUTH_TYPE, headerName:CONFIG.HEADER_NAME, fullEndpoint:CONFIG.FULL_ENDPOINT, workHours:CONFIG.WORK_HOURS, ENDPOINTS:{ user:'/me', punchesToday:'/punches/today', punch:'/punch' } };
+      let cfg = Object.assign({}, defaultCfg);
+      // allow runtime override of work hours, employee id and API key stored in sessionStorage
+      try{
+        const stored = sessionStorage.getItem('punch_target_hours');
+        if (stored !== null){ const v = parseFloat(stored); if (!isNaN(v) && v>0) cfg.workHours = v; }
+      }catch(e){}
+      try{
+        // load employee id from localStorage so it persists across browser sessions
+        const emp = localStorage.getItem('punch_emp_id');
+        if (emp !== null && emp.trim().length>0) cfg.empId = emp.trim();
+      }catch(e){}
+      try{
+        const brk = sessionStorage.getItem('punch_allowed_break_minutes');
+        if (brk !== null){ const v = parseFloat(brk); if (!isNaN(v) && v>0) allowedBreakMinutesCustom = v; }
+      }catch(e){}
+      // ensure API key is not persisted between sessions
+      // load API key from localStorage so it's preserved across browser sessions
+      try{ const storedKey = localStorage.getItem('punch_api_key'); if (storedKey !== null && storedKey.trim().length>0) cfg.API_KEY = storedKey.trim(); }catch(e){}
+      // wire set allowed break button
+      if (setBreakBtn){
+        setBreakBtn.addEventListener('click', ()=>{
+          const current = allowedBreakMinutesCustom ? String(allowedBreakMinutesCustom) : 'auto';
+          const ans = prompt('Set allowed break minutes (or leave empty for auto-compute)', current);
+          if (ans !== null && ans.trim().length > 0){
+            if (ans.toLowerCase() === 'auto'){ allowedBreakMinutesCustom = null; try{ sessionStorage.removeItem('punch_allowed_break_minutes'); }catch(e){}; }
+            else {
+              const v = parseFloat(ans);
+              if (!isNaN(v) && v > 0){ allowedBreakMinutesCustom = v; try{ sessionStorage.setItem('punch_allowed_break_minutes', String(v)); }catch(e){}; }
+              else { alert('Please enter a valid positive number or "auto"'); return; }
+            }
+            refresh();
+          } else if (ans !== null && ans.trim().length === 0){
+            // empty input means clear custom break
+            allowedBreakMinutesCustom = null;
+            try{ sessionStorage.removeItem('punch_allowed_break_minutes'); }catch(e){};
+            refresh();
+          }
+        });
+      }
+      if (targetLabel) targetLabel.textContent = `${cfg.workHours}h`;
+
+      // API request wrapper — accepts absolute URL or path
+      async function apiRequest(pathOrUrl, method='GET', body){
+        const isAbsolute = /^(https?:)?\/\//i.test(pathOrUrl);
+        const url = isAbsolute ? pathOrUrl : ((cfg.API_URL ? cfg.API_URL.replace(/\/$/,'') : '') + pathOrUrl);
+        const headers = { 'Content-Type': 'application/json' };
+        if (cfg.authType === 'Bearer' && cfg.API_KEY) headers['Authorization'] = 'Bearer ' + cfg.API_KEY;
+        else if (cfg.authType === 'Header' && cfg.API_KEY){ headers[cfg.headerName || 'X-API-KEY'] = cfg.API_KEY }
+        const opts = { method, headers };
+        if (body !== undefined) opts.body = JSON.stringify(body);
+        const res = await fetch(url, opts);
+        if (!res.ok){ const txt = await res.text(); throw new Error(res.status + ' ' + txt); }
+        return await res.json();
+      }
+      // wire set employee id button
+      if (setEmpBtn){
+        setEmpBtn.addEventListener('click', ()=>{
+          const current = cfg.empId || '';
+          const ans = prompt('Set Employee ID (e.g. ndxxx)', current);
+          if (ans !== null){ cfg.empId = ans.trim(); try{ localStorage.setItem('punch_emp_id', cfg.empId); }catch(e){}; refresh(); }
+        });
+      }
+      // wire set API key button
+      if (setKeyBtn){
+        setKeyBtn.addEventListener('click', ()=>{
+          const current = cfg.API_KEY || '';
+          const ans = prompt('Set API key/token (saved locally for future sessions)', current);
+          if (ans !== null){ cfg.API_KEY = ans.trim(); try{ localStorage.setItem('punch_api_key', cfg.API_KEY); }catch(e){}; refresh(); }
+        });
+      }
+      
+
+      
+      function calcTotals(punches){ let list = punches.slice(); let totalMs = 0; let lastIn = null; list.reverse().forEach(p=>{ if(p.action==='in') lastIn = new Date(p.at); if(p.action==='out' && lastIn){ totalMs += (new Date(p.at)-lastIn); lastIn = null } }); return totalMs }
+
+      function parseDateFromItem(it){
+        if (!it) return null;
+        if (it.fulldate) return new Date(it.fulldate);
+        if (it.at) return new Date(it.at);
+        // try combine sldate + sltime
+        if (it.sldate && it.sltime){
+          // sldate may be '2025-11-21T00:00:00' and sltime '10:36:51'
+          try{ const base = new Date(it.sldate); const parts = it.sltime.trim().split(':'); if(parts.length>=3){ base.setHours(parseInt(parts[0],10)); base.setMinutes(parseInt(parts[1],10)); base.setSeconds(parseInt(parts[2],10)); return base } }
+          catch(e){}
+        }
+        return null;
+      }
+
+      function msToHms(ms){ if(ms<=0) return '0h 0m'; const secs = Math.floor(ms/1000); const h = Math.floor(secs/3600); const m = Math.floor((secs%3600)/60); const s = secs%60; return `${h}h ${m}m ${s}s`; }
+
+      // Compute sessions (IN/OUT pairs) from a chronological list of punch items
+      function computeSessions(items){
+        const parsed = items.map(it=>({ item: it, date: parseDateFromItem(it), action: (it.action||'').toString().toLowerCase() })).filter(x=>x.date instanceof Date && !isNaN(x.date));
+        parsed.sort((a,b)=>a.date - b.date);
+        const sessions = [];
+        // if items include explicit action fields, prefer action-based pairing
+        const hasActions = parsed.some(p=>p.action==='in' || p.action==='out');
+        if (hasActions){
+          let currentIn = null;
+          for (const p of parsed){
+            if (p.action === 'in'){
+              currentIn = p;
+            } else if (p.action === 'out'){
+              if (currentIn){
+                sessions.push({ inDate: currentIn.date, outDate: p.date, inItem: currentIn.item, outItem: p.item });
+                currentIn = null;
+              } else {
+                // out without in: treat as a short session with unknown in
+                sessions.push({ inDate: null, outDate: p.date, inItem: null, outItem: p.item });
+              }
+            }
+          }
+          if (currentIn){ sessions.push({ inDate: currentIn.date, outDate: null, inItem: currentIn.item, outItem: null }); }
+          return sessions;
+        }
+
+        // fallback: pair sequentially (alternate in/out)
+        for(let i=0;i<parsed.length;i+=2){
+          const inEntry = parsed[i];
+          const outEntry = parsed[i+1];
+          const inDate = inEntry ? inEntry.date : null;
+          const outDate = outEntry ? outEntry.date : null;
+          sessions.push({ inDate, outDate, inItem: inEntry?inEntry.item:null, outItem: outEntry?outEntry.item:null });
+        }
+        return sessions;
+      }
+
+      function renderSessions(items){
+        punchListEl.innerHTML = '';
+        if(!items || items.length===0){ punchListEl.innerHTML = '<li class="muted">No punches yet</li>'; return }
+        const sessions = computeSessions(items);
+        // build sorted list of all parsed timestamps to include in logs
+        const parsedAll = items.map(it=>({ item: it, date: parseDateFromItem(it) })).filter(x=>x.date instanceof Date && !isNaN(x.date));
+        parsedAll.sort((a,b)=>a.date - b.date);
+
+          // Calculate worked and breaks
+          let totalWorked = 0;
+          let totalBreak = 0;
+          for(let i=0;i<sessions.length;i++){
+            const s = sessions[i];
+            const inTs = s.inDate ? s.inDate.getTime() : null;
+            const outTs = s.outDate ? s.outDate.getTime() : null;
+            let dur = 0;
+            if (inTs && outTs) dur = Math.max(0, outTs - inTs);
+            else if (inTs && !outTs) dur = Math.max(0, Date.now() - inTs);
+            totalWorked += dur;
+            // break: gap between this out and next in
+            if (outTs && sessions[i+1] && sessions[i+1].inDate){
+              const gap = Math.max(0, sessions[i+1].inDate.getTime() - outTs);
+              totalBreak += gap;
+            }
+
+            // collect all raw timestamps that fall within this session (inclusive)
+            let logsEntries = [];
+            if (inTs && outTs){
+              logsEntries = parsedAll.filter(p=>{ const t = p.date.getTime(); return t>=inTs && t<=outTs; });
+            } else if (inTs && !outTs){
+              logsEntries = parsedAll.filter(p=>{ const t = p.date.getTime(); return t>=inTs; });
+            } else if (!inTs && outTs){
+              // no IN recorded, include entries up to outTs
+              logsEntries = parsedAll.filter(p=>{ const t = p.date.getTime(); return t<=outTs; });
+            }
+
+            const li = document.createElement('li');
+            li.className = 'session-group';
+
+            const header = document.createElement('div');
+            header.className = 'session-header';
+
+            const toggle = document.createElement('button');
+            toggle.className = 'toggle-btn';
+            toggle.setAttribute('aria-expanded','false');
+            toggle.textContent = '▸';
+
+            const indexLabel = document.createElement('div');
+            indexLabel.className = 'session-index';
+            indexLabel.textContent = String(i+1).padStart(2,'0');
+
+            header.appendChild(toggle);
+            header.appendChild(indexLabel);
+            const summary = document.createElement('div'); summary.style.flex = '1';
+            summary.textContent = logsEntries.map(p=>formatTime(p.date.toISOString())).join(' → ');
+            header.appendChild(summary);
+            // session meta: duration, amount (if rate configured), and upcoming break
+            const meta = document.createElement('div'); meta.className = 'session-meta';
+            const durMs = dur || 0;
+            const durStr = msToHms(durMs);
+            // compute break after this session
+            let breakAfterMs = null;
+            if (outTs && sessions[i+1] && sessions[i+1].inDate){ breakAfterMs = Math.max(0, sessions[i+1].inDate.getTime() - outTs); }
+            const breakStr = breakAfterMs ? msToHms(breakAfterMs) : null;
+            meta.innerHTML = `Dur: ${durStr}${breakStr? '<br>Break: '+breakStr : ''}`;
+            header.appendChild(meta);
+
+            const logsDiv = document.createElement('div');
+            logsDiv.className = 'session-logs';
+            logsDiv.hidden = true;
+            if (breakStr){ const b = document.createElement('div'); b.className='break-info'; b.textContent = 'Break after: ' + breakStr; logsDiv.appendChild(b); }
+            if (logsEntries.length===0) logsDiv.innerHTML += '<div class="log-entry muted">(no raw timestamps)</div>';
+            else logsEntries.forEach(p=>{ const e = document.createElement('div'); e.className='log-entry'; e.textContent = formatTime(p.date.toISOString()); logsDiv.appendChild(e); });
+
+            // toggle behaviour with animation
+            function setOpen(open){
+              if (open){
+                logsDiv.classList.add('open');
+                toggle.classList.add('open');
+                toggle.setAttribute('aria-expanded','true');
+                // set maxHeight to scrollHeight to animate
+                logsDiv.style.maxHeight = logsDiv.scrollHeight + 'px';
+              } else {
+                // ensure we have a start height then collapse
+                logsDiv.style.maxHeight = logsDiv.scrollHeight + 'px';
+                // force reflow
+                void logsDiv.offsetHeight;
+                logsDiv.style.maxHeight = '0px';
+                logsDiv.classList.remove('open');
+                toggle.classList.remove('open');
+                toggle.setAttribute('aria-expanded','false');
+              }
+              toggle.textContent = open ? '▾' : '▸';
+            }
+            header.addEventListener('click', ()=> setOpen(!logsDiv.classList.contains('open')));
+            toggle.addEventListener('click', (ev)=>{ ev.stopPropagation(); setOpen(!logsDiv.classList.contains('open')); });
+
+            li.appendChild(header);
+            li.appendChild(logsDiv);
+            punchListEl.appendChild(li);
+          }
+
+        
+
+          return { sessions, totalWorked, totalBreak };
+        }
+
+      
+
+      async function refresh(){
+        try{
+          modeLabel.textContent = (cfg.API_URL && cfg.API_URL.length>0) || (cfg.fullEndpoint && cfg.fullEndpoint.length>0) ? 'API' : 'Mock';
+          // try fetch user (best-effort) — prefer API name, but do not show raw empId as a label
+          if ((cfg.API_URL && cfg.API_URL.length>0) || (cfg.fullEndpoint && cfg.fullEndpoint.length>0)){
+            // optimistic default while we attempt to load a real name
+            userNameEl.textContent = 'Punch details';
+            userEmailEl.textContent = '';
+            // attempt to fetch authenticated user's profile (many APIs expose /me)
+            try{
+              const user = await apiRequest(cfg.ENDPOINTS.user);
+              if (user && (user.comboempname || user.name || user.fullName || user.username)){
+                const uname = user.comboempname || user.name || user.fullName || user.username;
+                userNameEl.textContent = `${uname}'s punch details`;
+                userEmailEl.textContent = user.email || '';
+              }
+            }catch(e){
+              // ignore — we'll try to glean a name from the punches response below
+            }
+          } else { const mu = mock.user; userNameEl.textContent = mu.name + "'s punch details"; userEmailEl.textContent = mu.email; }
+
+          // if a fullEndpoint is provided, rewrite any fromdate/todate query params to today's date
+          const today = new Date();
+          const y = today.getFullYear();
+          const m = String(today.getMonth()+1).padStart(2,'0');
+          const d = String(today.getDate()).padStart(2,'0');
+          const todayStr = `${y}-${m}-${d}`;
+
+          let punchesPath = '';
+          if (cfg.fullEndpoint && cfg.fullEndpoint.length>0){
+            punchesPath = cfg.fullEndpoint.replace(/([?&]fromdate=)[^&]*/i, `$1${todayStr}`).replace(/([?&]todate=)[^&]*/i, `$1${todayStr}`);
+              // if no fromdate/todate present but there is a placeholder {date}, replace it
+              punchesPath = punchesPath.replace(/\{date\}/gi, todayStr).replace(/\{today\}/gi, todayStr);
+              // if an employee id is provided at runtime, replace placeholder {empid} or the empid query param
+              if (cfg.empId && cfg.empId.length>0){
+                punchesPath = punchesPath.replace(/\{empid\}/gi, cfg.empId);
+                punchesPath = punchesPath.replace(/([?&]empid=)[^&]*/i, `$1${cfg.empId}`);
+              }
+          } else {
+            punchesPath = cfg.ENDPOINTS.punchesToday;
+          }
+          // show the effective date used in the UI
+          const dateLabel = $('modeLabel');
+          if (dateLabel) dateLabel.textContent = todayStr;
+          const data = await apiRequest(punchesPath);
+          let punches = [];
+          if (Array.isArray(data)) punches = data;
+          else if (data && data.punches) punches = data.punches;
+          else if (data && data.data && Array.isArray(data.data)) punches = data.data;
+
+          // attempt to extract a display name from the punches response if profile fetch didn't return one
+          if ((!userNameEl.textContent || userNameEl.textContent === 'Punch details') && punches){
+            // common places APIs may include user info
+            const tryName = (obj) => {
+              if (!obj) return null;
+              return obj.comboempname || obj.comboEmpName || obj.comboEmpname || obj.name || obj.fullName || obj.username || obj.employeeName || obj.empName || obj.EmpName || null;
+            };
+            let foundName = null;
+            if (Array.isArray(punches) && punches.length>0){
+              // check first record for possible embedded employee info
+              const p0 = punches[0];
+              foundName = tryName(p0.user || p0.employee || p0);
+            } else if (punches && typeof punches === 'object'){
+              foundName = tryName(punches.user || punches.employee || punches);
+            }
+            if (foundName){ userNameEl.textContent = `${foundName}'s punch details`; }
+
+          }
+
+          // render sessions and compute worked/break totals
+          const result = renderSessions(punches);
+          if (result && result.sessions && result.sessions.length>0){
+            const firstIn = result.sessions[0].inDate;
+            const startedIconEl = $('startedIcon');
+            // show the earliest 'Started At' value, but keep the laptop icon active only
+            // while the current time is inside any session's in->out window (or after in if out missing)
+            if (firstIn){
+              $('startedAt').textContent = formatDateTime(firstIn.toISOString());
+            } else {
+              $('startedAt').textContent = '—';
+            }
+
+            // determine whether now is within any session window
+            let activeNow = false;
+            if (result && result.sessions && result.sessions.length>0){
+              const now = Date.now();
+              for (const s of result.sessions){
+                if (!s || !s.inDate) continue;
+                const inTs = s.inDate.getTime();
+                const outTs = s.outDate ? s.outDate.getTime() : null;
+                if (outTs){
+                  if (now >= inTs && now <= outTs){ activeNow = true; break; }
+                } else {
+                  // no out recorded — treat as ongoing session if inTs <= now
+                  if (now >= inTs){ activeNow = true; break; }
+                }
+              }
+            }
+            if (startedIconEl){ if (activeNow) startedIconEl.classList.add('active'); else startedIconEl.classList.remove('active'); }
+
+            const workedMs = result.totalWorked || 0;
+            const breaksMs = result.totalBreak || 0;
+
+            const totalHours = parseFloat(cfg.workHours) || 8;
+            const targetMs = totalHours * 3600 * 1000;
+
+            // Determine allowed break minutes snapshot for this refresh
+            let allowedBreakMinutesSnapshot = allowedBreakMinutesCustom;
+            if (allowedBreakMinutesSnapshot === null && firstIn){
+              const startHour = firstIn.getHours();
+              const startMin = firstIn.getMinutes();
+              const inMinutes = startHour * 60 + startMin;
+              const cutoffTime = 11 * 60; // 11:00 in minutes
+              allowedBreakMinutesSnapshot = (inMinutes < cutoffTime) ? 75 : 60;
+            }
+
+            // Cache base values for live UI updates between API refreshes
+            window.__punchLiveBase = {
+              refreshTs: Date.now(),
+              workedMsAtRefresh: workedMs,
+              breaksMs,
+              targetMs,
+              firstIn: firstIn ? firstIn.getTime() : null,
+              allowedBreakMinutes: allowedBreakMinutesSnapshot
+            };
+
+            // Helper to update the time-based stats using the latest clock
+            function updateLiveStats(){
+              const base = window.__punchLiveBase;
+              if (!base) return;
+
+              const nowTs = Date.now();
+              let liveWorkedMs = base.workedMsAtRefresh;
+
+              // Add elapsed time whenever active and there's an IN (open or closed session)
+              if (activeNow && base.firstIn){
+                const deltaSinceRefresh = nowTs - base.refreshTs;
+                if (deltaSinceRefresh > 0) {
+                  liveWorkedMs = base.workedMsAtRefresh + deltaSinceRefresh;
+                }
+              }
+
+              const allowedBreakMs = (base.allowedBreakMinutes || 0) * 60 * 1000;
+              const officeTargetMs = base.targetMs + allowedBreakMs;
+              const timeInOfficeSoFarMs = liveWorkedMs + base.breaksMs;
+              const remainingMs = Math.max(0, officeTargetMs - timeInOfficeSoFarMs);
+
+              // Update Worked So Far & Remaining
+              $('workedSoFar').textContent = msToHms(liveWorkedMs);
+              $('remaining').textContent = msToHms(remainingMs);
+              $('breaksTotal').textContent = `${Math.round(base.breaksMs/60000)} min`;
+
+              // Expected Leave: current time + remaining when session is open; otherwise compute normally
+              const lastSession = result.sessions[result.sessions.length - 1];
+              const lastSessionHasOut = lastSession && lastSession.outDate;
+              let leaveAt;
+
+              if (base.firstIn && !lastSessionHasOut) {
+                // Open session: Expected Leave = now + remaining (live)
+                leaveAt = new Date(nowTs + remainingMs);
+              } else if (base.firstIn) {
+                // Closed session: Expected Leave = first IN + total office time
+                const totalOfficeTimeMs = liveWorkedMs + base.breaksMs + remainingMs;
+                leaveAt = new Date(base.firstIn + totalOfficeTimeMs);
+              } else if (result.sessions && result.sessions.length > 0) {
+                // No IN but has sessions (e.g., only OUTs): fallback to now + remaining
+                leaveAt = new Date(nowTs + remainingMs);
+              } else {
+                // No punches: hide Expected Leave
+                $('expectedLeave').textContent = '—';
+                return;
+              }
+              $('expectedLeave').textContent = formatDateTime(leaveAt.toISOString());
+            }
+
+            // Run once immediately for this refresh
+            updateLiveStats();
+
+            // Ensure we have a single global timer to keep UI active every second
+            if (!window.__punchLiveTimer){
+              window.__punchLiveTimer = setInterval(updateLiveStats, 1000);
+            }
+            if (targetLabel) targetLabel.textContent = `${cfg.workHours}h`;
+            // compute break allowance
+            computeAndRenderBreaks(result.sessions, result.totalBreak);
+          } else {
+            $('startedAt').textContent='—'; $('workedSoFar').textContent='—'; $('remaining').textContent='—'; $('expectedLeave').textContent='—'; $('breaksTotal').textContent='—';
+            if (targetLabel) targetLabel.textContent = `${cfg.workHours}h`;
+            if (breaksRemainingEl) breaksRemainingEl.textContent = '—';
+          }
+
+          lastSync.textContent = new Date().toLocaleTimeString();
+        }catch(err){ console.error(err); alert('Error: '+err.message); modeLabel.textContent='Error'; }
+      }
+
+      // wire refresh button
+      if (refreshBtn) refreshBtn.addEventListener('click', ()=>{ refresh(); });
+      // wire set hours button (runtime only)
+      if (setHoursBtn){
+        setHoursBtn.addEventListener('click', ()=>{
+          const current = parseFloat(cfg.workHours) || CONFIG.WORK_HOURS || 8.25;
+          const answer = prompt('Set target work hours (e.g. 7 or 7.5)', String(current));
+          if (answer !== null){
+            const v = parseFloat(answer);
+            if (!isNaN(v) && v>0){ cfg.workHours = v; try{ sessionStorage.setItem('punch_target_hours', String(v)); }catch(e){}
+              if (targetLabel) targetLabel.textContent = `${v}h`;
+              refresh();
+            } else { alert('Please enter a valid positive number'); }
+          }
+        });
+      }
+
+      // planned leave input removed
+
+      // compute and render breaks info + remaining break allowance
+      function computeAndRenderBreaks(sessions, totalBreakMs){
+        // sessions: array with inDate/outDate
+        // collect breaks (gaps between out and next in)
+        const breaks = [];
+        for (let i=0;i<sessions.length;i++){
+          const s = sessions[i];
+          if (s.outDate && sessions[i+1] && sessions[i+1].inDate){
+            const gap = Math.max(0, sessions[i+1].inDate.getTime() - s.outDate.getTime());
+            breaks.push({ from: s.outDate, to: sessions[i+1].inDate, ms: gap });
+          }
+        }
+        // sort by proximity to now
+        const now = Date.now();
+        breaks.sort((a,b)=>Math.abs((a.from.getTime()+a.to.getTime())/2 - now) - Math.abs((b.from.getTime()+b.to.getTime())/2 - now));
+        // nearby breaks UI removed — we still compute break windows below
+
+        // compute remaining break allowance based on allowed policy
+        if (!breaksRemainingEl) return;
+        // need a start time
+        const firstIn = sessions && sessions.length>0 ? sessions[0].inDate : null;
+        if (!firstIn){ breaksRemainingEl.textContent = 'Set first IN'; return; }
+
+        // Determine allowed break:
+        // - If user set a custom value, use that
+        // - Else auto-compute: 75m if first IN before 11:00, else 60m
+        let allowedBreakMinutes = allowedBreakMinutesCustom;
+        if (allowedBreakMinutes === null){
+          const startHour = firstIn.getHours();
+          const startMin = firstIn.getMinutes();
+          const inMinutes = startHour * 60 + startMin;
+          const cutoffTime = 11 * 60; // 11:00 in minutes
+          allowedBreakMinutes = (inMinutes < cutoffTime) ? 75 : 60;
+        }
+
+        const allowedBreakMs = allowedBreakMinutes * 60 * 1000;
+        const takenBreakMs = totalBreakMs || 0;
+        const remainingBreakMs = Math.max(0, allowedBreakMs - takenBreakMs);
+        breaksRemainingEl.textContent = `${Math.round(remainingBreakMs/60000)} min`;
+      }
+
+      // init
+      refresh();
+
+      // auto-refresh every 60s
+      setInterval(refresh, 60000);
+    })();
+  </script>
+</body>
+</html>
